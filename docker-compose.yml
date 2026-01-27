@@ -1,165 +1,73 @@
 services:
-    app:
-        build: .
-        container_name: pet
-        user: root
-        depends_on:
-            - pgdb
-            - redis
-            - loki
-        env_file:
-            - .env
-        working_dir: /var/www/
-        volumes:
-            - .:/var/www
-        networks:
-            - pet
-        dns:
-            - 8.8.8.8
-            - 1.1.1.1
+  app:
+    build: .
+    container_name: pet
+    restart: always
+    depends_on:
+      - pgdb
+      - redis
+    env_file:
+      - .env
+    volumes:
+      - .:/var/www
+    networks:
+      - pet
 
-    pgdb:
-        container_name: pgdb
-        image: postgres
-        tty: true
-        restart: always
-        environment:
-            - POSTGRES_DB=${DB_DATABASE}
-            - POSTGRES_USER=${DB_USERNAME}
-            - POSTGRES_PASSWORD=${DB_PASSWORD}
-        ports:
-            - ${PGDB_PORT}
-        volumes:
-            - pgdata:/var/lib/postgresql
-        networks:
-            - pet
+  pgdb:
+    image: postgres:15
+    container_name: pgdb
+    restart: always
+    environment:
+      - POSTGRES_DB=${DB_DATABASE}
+      - POSTGRES_USER=${DB_USERNAME}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    networks:
+      - pet
 
-    nginx:
-        image: nginx:latest
-        container_name: nginx
-        restart: unless-stopped
-        ports:
-            - ${NGINX_PORT}
-            - "443:443"
-        volumes:
-            - .:/var/www
-            - ./docker/nginx:/etc/nginx/conf.d
-            - /etc/letsencrypt:/etc/letsencrypt:ro
-            - ./docker/nginx/logs:/var/log/nginx
-        environment:
-            - TZ=${SYSTEM_TIMEZONE}
-        depends_on:
-            - pgdb
-            - app
-            - pgadmin
-        networks:
-            - pet
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: always
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
+    networks:
+      - pet
 
-    pgadmin:
-        image: dpage/pgadmin4:latest
-        container_name: pgadmin
-        restart: always
-        depends_on:
-            - pgdb
-        environment:
-            - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL}
-            - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD}
-        ports:
-            - ${PGADMIN_PORT}
-        networks:
-            - pet
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - .:/var/www
+      - ./docker/nginx:/etc/nginx/conf.d
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - app
+    networks:
+      - pet
 
-    redis:
-        image: redis:latest
-        container_name: redis
-        restart: always
-        ports:
-            - ${REDIS_PORT}
-        environment:
-            - REDIS_PASSWORD=${REDIS_PASSWORD}
-        command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
-        networks:
-            - pet
-
-    redisinsight:
-        image: redislabs/redisinsight:latest
-        container_name: redisinsight
-        ports:
-            - ${REDISINSIGHT_PORT}
-        volumes:
-            - ./docker/redisinsight:/db
-        restart: always
-        networks:
-            - pet
-
-    grafana:
-        image: grafana/grafana:latest
-        container_name: grafana
-        user: "472"
-        environment:
-            GF_SECURITY_ADMIN_USER: ${GRAFANA_USER}
-            GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
-        depends_on:
-            - loki
-        networks:
-            - pet
-
-    queue:
-        build: .
-        container_name: laravel_queue
-        restart: always
-        depends_on:
-            - app
-            - redis
-        env_file:
-            - .env
-        working_dir: /var/www
-        volumes:
-            - .:/var/www
-        command: php artisan queue:work --sleep=3 --tries=3 --timeout=90
-        networks:
-            - pet
-        dns:
-            - 8.8.8.8
-            - 1.1.1.1
-
-    node:
-        build: ./docker/node
-        container_name: node_server
-        restart: always
-        volumes:
-            - ./docker/node/server.js:/usr/src/app/server.js
-        depends_on:
-            - redis
-        env_file:
-            - .env
-        ports:
-            - "3001:3000"
-        networks:
-            - pet
-
-    loki:
-        image: grafana/loki:latest
-        container_name: loki
-        ports:
-            - ${LOKI_PORT}
-        networks:
-            - pet
-
-    promtail:
-        image: grafana/promtail:2.9.1
-        container_name: promtail
-        volumes:
-            - ./docker/promtail/promtail-config.yaml:/etc/promtail/config.yml
-            - ./docker/nginx/logs:/var/log/nginx
-        command: -config.file=/etc/promtail/config.yml
-        depends_on:
-            - loki
-        networks:
-            - pet
+  queue:
+    build: .
+    container_name: laravel_queue
+    restart: always
+    command: php artisan queue:work --sleep=3 --tries=3 --timeout=90
+    depends_on:
+      - app
+      - redis
+    env_file:
+      - .env
+    volumes:
+      - .:/var/www
+    networks:
+      - pet
 
 volumes:
-    pgdata:
+  pgdata:
+
 networks:
-    pet:
-        driver: bridge
+  pet:
+    driver: bridge
