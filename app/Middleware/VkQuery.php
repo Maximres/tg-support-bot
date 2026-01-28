@@ -2,9 +2,9 @@
 
 namespace App\Middleware;
 
-use App\Logging\LokiLogger;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Mockery\Exception;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -41,9 +41,6 @@ class VkQuery
      */
     private function sendRequestInLoki(Request $request): void
     {
-        $dataRequest = json_encode($request->all());
-
-        $logger = new LokiLogger();
-        $logger->log('vk_request', $dataRequest);
+        Log::info('vk_request', ['data' => $request->all()]);
     }
 }

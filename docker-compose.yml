@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   app:
     build: .
@@ -64,7 +66,6 @@ services:
       - .:/var/www
     networks:
       - pet
-
 volumes:
   pgdata:
 

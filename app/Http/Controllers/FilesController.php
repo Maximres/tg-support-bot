@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Logging\LokiLogger;
 use App\Services\File\FileService;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -33,7 +33,7 @@ class FilesController
         try {
             return $this->fileService->streamFile($fileId);
         } catch (\Throwable $e) {
-            (new LokiLogger())->log('tg_request', $e->getMessage());
+            Log::error('File stream error', ['fileId' => $fileId, 'error' => $e->getMessage()]);
             die();
         }
     }
@@ -50,7 +50,7 @@ class FilesController
         try {
             return $this->fileService->downloadFile($fileId);
         } catch (\Throwable $e) {
-            (new LokiLogger())->log('tg_request', $e->getMessage());
+            Log::error('File download error', ['fileId' => $fileId, 'error' => $e->getMessage()]);
             die();
         }
     }

@@ -1,6 +1,5 @@
 <?php
 
-use App\Logging\LokiLogger;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -27,21 +26,13 @@ return Application::configure(basePath: dirname(__DIR__))
             ], 404);
         });
 
-        /**
-         * Sending log in Loki
-         * Обернуто в try-catch, чтобы ошибки логирования не ломали ответ
-         */
         $exceptions->render(function (Throwable $e, Request $request) {
-            try {
-                // Проверяем, что Loki настроен и доступен
-                $lokiUrl = config('loki_custom.url');
-                if ($lokiUrl && filter_var($lokiUrl, FILTER_VALIDATE_URL)) {
-                    (new LokiLogger())->sendBasicLog($e);
-                }
-            } catch (\Throwable $logError) {
-                // Игнорируем ошибки логирования, чтобы не сломать ответ
-                error_log('Failed to log to Loki: ' . $logError->getMessage());
-            }
+            // Логирование ошибок через стандартный канал Laravel
+            \Log::error('Exception: ' . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             
             if (env('APP_DEBUG') === false) {
                 return response('ok', 200);
