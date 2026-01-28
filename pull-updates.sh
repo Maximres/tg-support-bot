@@ -133,6 +133,38 @@ if [ -n "$TRACKED_CHANGES" ] || [ -n "$UNTRACKED_FILES" ]; then
         2)
             echo -e "${YELLOW}⚠ Продолжаем без сохранения изменений${NC}"
             echo "  Неотслеживаемые файлы останутся без изменений"
+            
+            # Проверяем конфликты с файлами из удаленного репозитория
+            echo ""
+            echo "Проверка конфликтов с файлами из удаленного репозитория..."
+            git fetch origin main >/dev/null 2>&1 || true
+            REMOTE_FILES=$(git ls-tree -r origin/main --name-only 2>/dev/null || echo "")
+            
+            if [ -n "$REMOTE_FILES" ] && [ -n "$UNTRACKED_FILES" ]; then
+                CONFLICTS=""
+                for file in $UNTRACKED_FILES; do
+                    if echo "$REMOTE_FILES" | grep -q "^$file$"; then
+                        CONFLICTS="${CONFLICTS}${file}\n"
+                    fi
+                done
+                
+                if [ -n "$CONFLICTS" ]; then
+                    echo -e "${YELLOW}⚠ Найдены неотслеживаемые файлы, которые существуют в удаленном репозитории:${NC}"
+                    echo -e "$CONFLICTS" | sed 's/^/  - /'
+                    echo ""
+                    echo "Эти файлы будут перезаписаны при merge."
+                    echo "Локальные копии будут сохранены с расширением .local.backup"
+                    
+                    for file in $(echo -e "$CONFLICTS"); do
+                        if [ -f "$file" ]; then
+                            BACKUP_NAME="${file}.local.backup.$(date +%Y%m%d_%H%M%S)"
+                            cp "$file" "$BACKUP_NAME" 2>/dev/null && echo "  Сохранено: $BACKUP_NAME" || true
+                            rm -f "$file"
+                            echo "  Удален локальный файл: $file"
+                        fi
+                    done
+                fi
+            fi
             ;;
         3)
             echo -e "${RED}✗ Обновление отменено${NC}"
@@ -184,6 +216,40 @@ if [ "$CURRENT_BRANCH" != "main" ]; then
     git checkout main || {
         echo -e "${YELLOW}⚠ Не удалось переключиться на main, пробуем обновить текущую ветку${NC}"
     }
+fi
+
+# Проверяем конфликты с неотслеживаемыми файлами перед merge
+echo ""
+echo "Проверка конфликтов с неотслеживаемыми файлами..."
+UNTRACKED_NOW=$(git ls-files --others --exclude-standard 2>/dev/null || echo "")
+REMOTE_FILES=$(git ls-tree -r origin/main --name-only 2>/dev/null || echo "")
+
+if [ -n "$UNTRACKED_NOW" ] && [ -n "$REMOTE_FILES" ]; then
+    CONFLICT_FILES=""
+    for file in $UNTRACKED_NOW; do
+        if echo "$REMOTE_FILES" | grep -q "^$file$"; then
+            CONFLICT_FILES="${CONFLICT_FILES}${file}\n"
+        fi
+    done
+    
+    if [ -n "$CONFLICT_FILES" ]; then
+        echo -e "${YELLOW}⚠ Найдены неотслеживаемые файлы, которые конфликтуют с удаленным репозиторием:${NC}"
+        echo -e "$CONFLICT_FILES" | sed 's/^/  - /'
+        echo ""
+        echo "Сохраняем локальные копии и удаляем файлы для merge..."
+        
+        for file in $(echo -e "$CONFLICT_FILES"); do
+            if [ -f "$file" ]; then
+                BACKUP_NAME="${file}.local.backup.$(date +%Y%m%d_%H%M%S)"
+                cp "$file" "$BACKUP_NAME" 2>/dev/null && echo "  ✓ Сохранено: $BACKUP_NAME" || true
+                rm -f "$file"
+                echo "  ✓ Удален локальный файл: $file"
+            fi
+        done
+        echo ""
+    else
+        echo -e "${GREEN}✓ Конфликтов с неотслеживаемыми файлами не найдено${NC}"
+    fi
 fi
 
 # Обновляем код
