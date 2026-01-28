@@ -3,6 +3,11 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Request;
 
+// Включаем буферизацию вывода для предотвращения проблем с заголовками
+if (!ob_get_level()) {
+    ob_start();
+}
+
 define('LARAVEL_START', microtime(true));
 
 // Determine if the application is in maintenance mode...

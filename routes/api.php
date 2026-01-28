@@ -3,6 +3,7 @@
 use App\Http\Controllers\AiTelegramBotController;
 use App\Http\Controllers\ExternalTrafficController;
 use App\Http\Controllers\FilesController;
+use App\Http\Controllers\HealthController;
 use App\Http\Controllers\TelegramBotController;
 use App\Http\Controllers\VkBotController;
 use App\Middleware\ApiQuery;
@@ -73,3 +74,7 @@ Route::group([
         ->where('file_id', '[A-Za-z0-9\-_]+')
         ->name('download_file');
 });
+
+// Health check endpoints
+Route::get('/health', [HealthController::class, 'check'])->name('health.check');
+Route::get('/health/simple', [HealthController::class, 'simple'])->name('health.simple');

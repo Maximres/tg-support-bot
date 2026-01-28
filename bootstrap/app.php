@@ -29,9 +29,20 @@ return Application::configure(basePath: dirname(__DIR__))
 
         /**
          * Sending log in Loki
+         * Обернуто в try-catch, чтобы ошибки логирования не ломали ответ
          */
         $exceptions->render(function (Throwable $e, Request $request) {
-            (new LokiLogger())->sendBasicLog($e);
+            try {
+                // Проверяем, что Loki настроен и доступен
+                $lokiUrl = config('loki_custom.url');
+                if ($lokiUrl && filter_var($lokiUrl, FILTER_VALIDATE_URL)) {
+                    (new LokiLogger())->sendBasicLog($e);
+                }
+            } catch (\Throwable $logError) {
+                // Игнорируем ошибки логирования, чтобы не сломать ответ
+                error_log('Failed to log to Loki: ' . $logError->getMessage());
+            }
+            
             if (env('APP_DEBUG') === false) {
                 return response('ok', 200);
             }

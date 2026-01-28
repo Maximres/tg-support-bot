@@ -63,11 +63,14 @@ class LokiLogger
 
             $this->client->post($this->url, [
                 'json' => $payload,
+                'timeout' => 2, // Быстрый таймаут, чтобы не блокировать ответ
             ]);
 
             return true;
         } catch (Throwable $e) {
-            dump($e->getMessage());
+            // Не выводим ничего, чтобы не сломать заголовки ответа
+            // Логируем только в error_log, если нужно
+            error_log('LokiLogger error: ' . $e->getMessage());
             return false;
         }
     }
@@ -106,10 +109,13 @@ class LokiLogger
 
             $this->client->post($this->url, [
                 'json' => $payload,
+                'timeout' => 2, // Быстрый таймаут, чтобы не блокировать ответ
             ]);
 
             return true;
         } catch (Throwable $e) {
+            // Не выводим ничего, чтобы не сломать заголовки ответа
+            error_log('LokiLogger error: ' . $e->getMessage());
             return false;
         }
     }
