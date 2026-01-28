@@ -16,6 +16,9 @@ use phpDocumentor\Reflection\Exception;
  * @property int               $topic_id
  * @property int               $chat_id
  * @property string            $platform
+ * @property string|null       $phone_number
+ * @property string|null       $custom_topic_name
+ * @property bool              $topic_name_edited
  * @property mixed             $aiCondition
  * @property mixed             $lastMessageManager
  * @property ExternalUser|null $externalUser
@@ -31,6 +34,9 @@ class BotUser extends Model
         'chat_id',
         'topic_id',
         'platform',
+        'phone_number',
+        'custom_topic_name',
+        'topic_name_edited',
         'is_banned',
         'banned_at',
     ];
@@ -245,5 +251,43 @@ class BotUser extends Model
     public function isBanned(): bool
     {
         return $this->is_banned ?? false;
+    }
+
+    /**
+     * Проверяет, было ли название топика изменено вручную
+     *
+     * @return bool
+     */
+    public function hasCustomTopicName(): bool
+    {
+        return (bool)$this->topic_name_edited && !empty($this->custom_topic_name);
+    }
+
+    /**
+     * Сохраняет кастомное название топика
+     *
+     * @param string $topicName
+     *
+     * @return void
+     */
+    public function setCustomTopicName(string $topicName): void
+    {
+        // Обновляем модель только если она уже сохранена в БД
+        if ($this->exists) {
+            $this->refresh();
+        }
+        $this->custom_topic_name = $topicName;
+        $this->topic_name_edited = true;
+        $this->save();
+    }
+
+    /**
+     * Получает название топика (кастомное или null)
+     *
+     * @return string|null
+     */
+    public function getCustomTopicName(): ?string
+    {
+        return $this->custom_topic_name;
     }
 }

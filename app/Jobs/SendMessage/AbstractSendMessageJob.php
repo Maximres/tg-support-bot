@@ -62,12 +62,21 @@ abstract class AbstractSendMessageJob implements ShouldQueue
      */
     protected function updateTopic(BotUser $botUser, string $typeMessage): void
     {
-        SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from([
+        // Если название было изменено вручную, обновляем только иконку
+        $params = [
             'methodQuery' => 'editForumTopic',
             'chat_id' => config('traffic_source.settings.telegram.group_id'),
             'message_thread_id' => $botUser->topic_id,
             'icon_custom_emoji_id' => __('icons.' . $typeMessage),
-        ]));
+        ];
+
+        // Не обновляем название, если оно было изменено вручную
+        if (!$botUser->hasCustomTopicName()) {
+            // Можно добавить обновление названия здесь, если нужно
+            // Но по умолчанию обновляем только иконку
+        }
+
+        SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from($params));
     }
 
     protected function telegramResponseHandler(TelegramAnswerDto $response): void

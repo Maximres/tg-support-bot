@@ -94,39 +94,38 @@ class TopicCreateJob implements ShouldQueue
     protected function generateNameTopic(BotUser $botUser): string
     {
         try {
+            // Если есть кастомное название, используем его
+            if ($botUser->hasCustomTopicName()) {
+                return $botUser->getCustomTopicName();
+            }
+
             if ($botUser->platform === 'external_source') {
                 $source = ExternalUser::getSourceById($botUser->chat_id);
                 return "#{$botUser->chat_id} ({$source})";
             }
 
-            $templateTopicName = config('traffic_source.settings.telegram.template_topic_name');
-            if (empty($templateTopicName)) {
-                throw new \Exception('Template not found');
-            }
-
-            if (preg_match('/(\{platform})/', $templateTopicName)) {
-                $templateTopicName = str_replace('{platform}', $botUser->platform, $templateTopicName);
-            }
-
+            // Получаем данные пользователя
             $nameParts = $this->getPartsGenerateName($botUser->chat_id);
             if (empty($nameParts)) {
                 throw new \Exception('Name parts not found');
             }
 
-            // parsing template
-            preg_match_all('/{([^}]+)}/', $templateTopicName, $matches);
-            if (empty($matches[1])) {
-                throw new \Exception('Params template topic name not found');
+            // Формируем название: #ID Имя Фамилия +номер
+            $topicName = '#' . $botUser->chat_id;
+            
+            $firstName = $nameParts['first_name'] ?? '';
+            $lastName = $nameParts['last_name'] ?? '';
+            
+            if (!empty($firstName) || !empty($lastName)) {
+                $fullName = trim($firstName . ' ' . $lastName);
+                if (!empty($fullName)) {
+                    $topicName .= ' ' . $fullName;
+                }
             }
 
-            $paramsParts = array_combine($matches[0], $matches[1]);
-
-            $topicName = $templateTopicName;
-            foreach ($paramsParts as $key => $param) {
-                if (empty($nameParts[$param])) {
-                    throw new \Exception('Params template topic name not found');
-                }
-                $topicName = str_replace($key, $nameParts[$param], $topicName);
+            // Добавляем номер телефона, если доступен
+            if (!empty($botUser->phone_number)) {
+                $topicName .= ' ' . $botUser->phone_number;
             }
 
             return $topicName;

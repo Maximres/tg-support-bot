@@ -67,6 +67,12 @@ class TgExternalMessageService extends FromTgMessageService
             } elseif (!empty($this->update->rawData['message']['contact'])) {
                 $contactData = $this->update->rawData['message']['contact'];
 
+                // Сохраняем номер телефона в BotUser
+                if (!empty($contactData['phone_number']) && $this->botUser) {
+                    $this->botUser->phone_number = $contactData['phone_number'];
+                    $this->botUser->save();
+                }
+
                 $textMessage = "Контакт: \n";
                 if (!empty($contactData['first_name'])) {
                     $textMessage .= "Имя: {$contactData['first_name']}\n";

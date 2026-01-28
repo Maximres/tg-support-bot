@@ -129,6 +129,12 @@ class TgMessageService extends FromTgMessageService
         $this->messageParamsDTO->methodQuery = 'sendMessage';
         $contactData = $this->update->rawData['message']['contact'];
 
+        // Сохраняем номер телефона в BotUser
+        if (!empty($contactData['phone_number']) && $this->botUser) {
+            $this->botUser->phone_number = $contactData['phone_number'];
+            $this->botUser->save();
+        }
+
         $textMessage = "Контакт: \n";
         $textMessage .= "Имя: {$contactData['first_name']}\n";
         if (!empty($contactData['phone_number'])) {

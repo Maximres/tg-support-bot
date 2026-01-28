@@ -4,14 +4,22 @@ services:
     container_name: pet
     restart: always
     depends_on:
-      - pgdb
-      - redis
+      pgdb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     env_file:
       - .env
     volumes:
       - .:/var/www
     networks:
       - pet
+    healthcheck:
+      test: ["CMD-SHELL", "php -r 'exit(0);' || exit(1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   pgdb:
     image: postgres:15
@@ -25,6 +33,12 @@ services:
       - pgdata:/var/lib/postgresql
     networks:
       - pet
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   redis:
     image: redis:7-alpine
@@ -33,6 +47,12 @@ services:
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
     networks:
       - pet
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
   nginx:
     image: nginx:alpine
@@ -46,9 +66,16 @@ services:
       - ./docker/nginx:/etc/nginx/conf.d
       - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
-      - app
+      app:
+        condition: service_healthy
     networks:
       - pet
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   queue:
     build: .
@@ -56,14 +83,22 @@ services:
     restart: always
     command: php artisan queue:work --sleep=3 --tries=3 --timeout=90
     depends_on:
-      - app
-      - redis
+      app:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     env_file:
       - .env
     volumes:
       - .:/var/www
     networks:
       - pet
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(0);"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 volumes:
   pgdata:
 

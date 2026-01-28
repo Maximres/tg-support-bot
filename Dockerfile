@@ -21,7 +21,20 @@ ENV COMPOSER_ALLOW_SUPERUSER=1
 # WORKDIR до COPY проекта
 WORKDIR /var/www
 
-# Копируем проект
+# Отключаем получение git commit info для Laravel/npm
+ENV LARAVEL_GIT_COMMIT=false
+
+# Копируем файлы зависимостей отдельно для лучшего кеширования
+COPY composer.json composer.lock* ./
+COPY package.json package-lock.json* ./
+
+# Установка PHP зависимостей (кешируется, если composer.json не изменился)
+RUN composer install --no-interaction --prefer-dist --optimize-autoloader --no-scripts
+
+# Установка Node.js зависимостей (кешируется, если package.json не изменился)
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+# Копируем остальные файлы проекта
 COPY . .
 
 # Права доступа на storage и bootstrap/cache
@@ -33,14 +46,8 @@ RUN mkdir -p storage/logs \
     find storage bootstrap/cache -type d -exec chmod 775 {} + && \
     find storage bootstrap/cache -type f -exec chmod 664 {} +
 
-# Отключаем получение git commit info для Laravel/npm
-ENV LARAVEL_GIT_COMMIT=false
-
-# Установка PHP зависимостей
-RUN composer install --no-interaction --prefer-dist --optimize-autoloader
-
-# Установка Node.js зависимостей и сборка фронтенда
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi && \
+# Запускаем post-install скрипты Composer и сборку фронтенда
+RUN composer dump-autoload --optimize && \
     npm run build
 
 # Меняем пользователя на www-data

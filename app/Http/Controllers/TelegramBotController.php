@@ -89,6 +89,23 @@ class TelegramBotController
     {
         $this->checkBotQuery();
         if ($this->dataHook->editedTopicStatus && $this->dataHook->typeSource === 'supergroup') {
+            // Сохраняем кастомное название топика при ручном редактировании
+            if ($this->botUser && 
+                !empty($this->dataHook->rawData['message']['forum_topic_edited']) &&
+                !empty($this->dataHook->rawData['message']['forum_topic_edited']['name'])) {
+                try {
+                    $newTopicName = $this->dataHook->rawData['message']['forum_topic_edited']['name'];
+                    $this->botUser->setCustomTopicName($newTopicName);
+                } catch (\Throwable $e) {
+                    // Логируем ошибку, но продолжаем выполнение
+                    \Log::warning('Ошибка сохранения кастомного названия топика', [
+                        'error' => $e->getMessage(),
+                        'bot_user_id' => $this->botUser->id ?? null,
+                    ]);
+                }
+            }
+
+            // Удаляем сообщение о редактировании
             SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from([
                 'methodQuery' => 'deleteMessage',
                 'chat_id' => config('traffic_source.settings.telegram.group_id'),
