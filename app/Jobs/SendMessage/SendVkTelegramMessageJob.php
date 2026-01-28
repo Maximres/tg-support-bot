@@ -10,6 +10,7 @@ use App\Logging\LokiLogger;
 use App\Models\BotUser;
 use App\Models\Message;
 use App\TelegramBot\TelegramMethods;
+use Illuminate\Support\Facades\Log;
 
 class SendVkTelegramMessageJob extends AbstractSendMessageJob
 {
@@ -49,6 +50,28 @@ class SendVkTelegramMessageJob extends AbstractSendMessageJob
             $params = $this->queryParams->toArray();
 
             if ($botUser->topic_id) {
+                // Проверяем, существует ли топик перед отправкой
+                if (!\App\Actions\Telegram\CheckTopicExists::execute((int)$botUser->topic_id)) {
+                    Log::warning('Топик не существует, очищаем topic_id и создаем новый', [
+                        'bot_user_id' => $this->botUserId,
+                        'old_topic_id' => $botUser->topic_id,
+                    ]);
+                    
+                    $botUser->topic_id = null;
+                    $botUser->save();
+                    
+                    TopicCreateJob::withChain([
+                        new SendVkTelegramMessageJob(
+                            $this->botUserId,
+                            $this->updateDto,
+                            $this->queryParams,
+                            $this->typeMessage
+                        ),
+                    ])->dispatch($this->botUserId);
+                    
+                    return;
+                }
+                
                 $params['message_thread_id'] = $botUser->topic_id;
             } else {
                 TopicCreateJob::withChain([

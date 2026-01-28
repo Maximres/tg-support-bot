@@ -97,9 +97,20 @@ abstract class AbstractSendMessageJob implements ShouldQueue
             return;
         }
 
-        // ✅ 400 TOPIC_NOT_FOUND
-        if ($response->response_code === 400 && $response->type_error === 'TOPIC_NOT_FOUND' || $response->type_error === 'TOPIC_DELETED') {
-            Log::warning('TOPIC_NOT_FOUND → создаём новую тему');
+        // ✅ 400 TOPIC_NOT_FOUND или TOPIC_DELETED
+        if ($response->response_code === 400 && 
+            ($response->type_error === 'TOPIC_NOT_FOUND' || $response->type_error === 'TOPIC_DELETED')) {
+            Log::warning('TOPIC_NOT_FOUND/TOPIC_DELETED → очищаем topic_id и создаём новую тему', [
+                'bot_user_id' => $this->botUserId,
+                'old_topic_id' => BotUser::find($this->botUserId)->topic_id ?? null,
+            ]);
+
+            // Очищаем topic_id в БД перед созданием нового топика
+            $botUser = BotUser::find($this->botUserId);
+            if ($botUser && $botUser->topic_id) {
+                $botUser->topic_id = null;
+                $botUser->save();
+            }
 
             if ($this->updateDto instanceof ExternalMessageDto) {
                 TopicCreateJob::withChain([

@@ -11,6 +11,7 @@ use App\Models\BotUser;
 use App\Models\Message;
 use App\TelegramBot\TelegramMethods;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class SendExternalTelegramMessageJob extends AbstractSendMessageJob
@@ -55,6 +56,28 @@ class SendExternalTelegramMessageJob extends AbstractSendMessageJob
 
             if ($this->typeMessage === 'incoming') {
                 if ($botUser->topic_id) {
+                    // Проверяем, существует ли топик перед отправкой
+                    if (!\App\Actions\Telegram\CheckTopicExists::execute((int)$botUser->topic_id)) {
+                        Log::warning('Топик не существует, очищаем topic_id и создаем новый', [
+                            'bot_user_id' => $this->botUserId,
+                            'old_topic_id' => $botUser->topic_id,
+                        ]);
+                        
+                        $botUser->topic_id = null;
+                        $botUser->save();
+                        
+                        TopicCreateJob::withChain([
+                            new SendExternalTelegramMessageJob(
+                                $this->botUserId,
+                                $this->updateDto,
+                                $this->queryParams,
+                                $this->typeMessage
+                            ),
+                        ])->dispatch($this->botUserId);
+                        
+                        return;
+                    }
+                    
                     $params['message_thread_id'] = $botUser->topic_id;
                 } else {
                     TopicCreateJob::withChain([
