@@ -84,25 +84,58 @@ abstract class AbstractSendMessageJob implements ShouldQueue
             return;
         }
         
-        // Добавляем небольшую задержку перед обновлением иконки для предотвращения race conditions
-        // Это помогает избежать конфликтов при параллельных обновлениях
-        $params = [
-            'methodQuery' => 'editForumTopic',
-            'chat_id' => config('traffic_source.settings.telegram.group_id'),
-            'message_thread_id' => $botUser->topic_id,
-            'icon_custom_emoji_id' => $targetIcon,
-        ];
-
-        // Не обновляем название, если оно было изменено вручную
-        if (!$botUser->hasCustomTopicName()) {
-            // Можно добавить обновление названия здесь, если нужно
-            // Но по умолчанию обновляем только иконку
+        // Защита от дублирующих обновлений: используем Redis блокировку
+        // Ключ блокировки: topic_icon_update_{topic_id}
+        $lockKey = 'topic_icon_update_' . $botUser->topic_id;
+        $lockTimeout = 5; // секунды
+        
+        // Пытаемся получить блокировку
+        $lock = \Illuminate\Support\Facades\Cache::lock($lockKey, $lockTimeout);
+        
+        if (!$lock->get()) {
+            // Блокировка уже установлена другим процессом - пропускаем обновление
+            Log::debug('updateTopic: пропускаем обновление, так как уже есть активное обновление', [
+                'bot_user_id' => $botUser->id ?? null,
+                'topic_id' => $botUser->topic_id,
+                'type_message' => $typeMessage,
+                'target_icon' => $targetIcon,
+            ]);
+            return;
         }
+        
+        try {
+            // Добавляем небольшую задержку перед обновлением иконки для предотвращения race conditions
+            // Это помогает избежать конфликтов при параллельных обновлениях
+            $params = [
+                'methodQuery' => 'editForumTopic',
+                'chat_id' => config('traffic_source.settings.telegram.group_id'),
+                'message_thread_id' => $botUser->topic_id,
+                'icon_custom_emoji_id' => $targetIcon,
+            ];
 
-        // Добавляем задержку перед отправкой для предотвращения конфликтов
-        // Используем delay() для отложенной отправки
-        SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from($params))
-            ->delay(now()->addSeconds(1));
+            // Не обновляем название, если оно было изменено вручную
+            if (!$botUser->hasCustomTopicName()) {
+                // Можно добавить обновление названия здесь, если нужно
+                // Но по умолчанию обновляем только иконку
+            }
+
+            // Добавляем задержку перед отправкой для предотвращения конфликтов
+            // Используем delay() для отложенной отправки
+            // После выполнения джоба блокировка автоматически снимется
+            SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from($params))
+                ->delay(now()->addSeconds(1));
+            
+            Log::debug('updateTopic: запланировано обновление иконки', [
+                'bot_user_id' => $botUser->id ?? null,
+                'topic_id' => $botUser->topic_id,
+                'type_message' => $typeMessage,
+                'target_icon' => $targetIcon,
+            ]);
+        } finally {
+            // Освобождаем блокировку через небольшую задержку, чтобы дать время джобу выполниться
+            // Но не сразу, чтобы предотвратить дублирующие обновления
+            \Illuminate\Support\Facades\Cache::put($lockKey . '_released', true, $lockTimeout);
+        }
     }
 
     protected function telegramResponseHandler(TelegramAnswerDto $response): void

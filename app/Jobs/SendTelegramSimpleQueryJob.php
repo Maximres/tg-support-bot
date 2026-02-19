@@ -61,11 +61,20 @@ class SendTelegramSimpleQueryJob implements ShouldQueue
 
             // Логируем успешное обновление иконки для отладки
             if ($methodQuery === 'editForumTopic') {
-                \Illuminate\Support\Facades\Log::debug('Иконка топика успешно обновлена', [
+                $topicId = $params['message_thread_id'] ?? null;
+                \Illuminate\Support\Facades\Log::info('Иконка топика успешно обновлена', [
                     'method' => $methodQuery,
-                    'topic_id' => $params['message_thread_id'] ?? null,
+                    'topic_id' => $topicId,
                     'icon' => $params['icon_custom_emoji_id'] ?? null,
+                    'timestamp' => now()->toIso8601String(),
                 ]);
+                
+                // Освобождаем блокировку после успешного обновления
+                if ($topicId) {
+                    $lockKey = 'topic_icon_update_' . $topicId;
+                    \Illuminate\Support\Facades\Cache::forget($lockKey);
+                    \Illuminate\Support\Facades\Cache::forget($lockKey . '_released');
+                }
             }
 
             return true;
