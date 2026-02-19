@@ -15,7 +15,7 @@ class LokiLogger
     public function __construct(Client|null $client = null)
     {
         $this->client = $client ?? new Client();
-        $this->url = config('loki_custom.url');
+        $this->url = config('loki_custom.url') ?? '';
     }
 
     /**
@@ -43,6 +43,11 @@ class LokiLogger
     public function log(string $level, mixed $message): bool
     {
         try {
+            // Если URL не настроен, просто возвращаем true (не логируем)
+            if (empty($this->url)) {
+                return true;
+            }
+
             $payload = [
                 'streams' => [
                     [
@@ -83,6 +88,11 @@ class LokiLogger
     public function logException(Throwable|Exception $e): bool
     {
         try {
+            // Если URL не настроен, просто возвращаем true (не логируем)
+            if (empty($this->url)) {
+                return true;
+            }
+
             $level = $e->getCode() === 1 ? 'warning' : 'error';
 
             $payload = [
