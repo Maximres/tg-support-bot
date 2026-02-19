@@ -54,8 +54,17 @@ class TelegramBotController
             $this->botUser = (new BotUser())->getUserByChatId($this->dataHook->chatId, 'telegram');
             $this->platform = 'telegram';
         } else {
-            $this->botUser = (new BotUser())->getByTopicId($this->dataHook->messageThreadId);
-            $this->platform = $this->botUser->platform ?? null;
+            // Проверяем, не является ли это топиком массовых рассылок
+            // Если да, то не ищем пользователя и не прерываем выполнение
+            if (IsBroadcastTopic::execute($this->dataHook->messageThreadId)) {
+                // Это топик массовых рассылок - устанавливаем platform как 'telegram' для продолжения
+                $this->platform = 'telegram';
+                $this->botUser = null; // Для массовой рассылки пользователь не нужен
+            } else {
+                // Обычный топик - ищем пользователя
+                $this->botUser = (new BotUser())->getByTopicId($this->dataHook->messageThreadId);
+                $this->platform = $this->botUser->platform ?? null;
+            }
         }
 
         if (empty($this->platform)) {
