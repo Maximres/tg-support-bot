@@ -9,6 +9,7 @@ return [
             // use IPv4 only to connect to Telegram api
             'force_ipv4' => (bool)env('TELEGRAM_FORCE_IPV4', false),
             'template_topic_name' => env('TELEGRAM_TOPIC_NAME', ''),
+            'broadcast_topic_id' => env('TELEGRAM_BROADCAST_TOPIC_ID', null),
         ],
         'telegram_ai' => [
             'username' => env('TELEGRAM_AI_BOT_USERNAME', ''),

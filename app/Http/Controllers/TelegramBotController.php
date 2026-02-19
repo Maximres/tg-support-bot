@@ -21,6 +21,8 @@ use App\Services\TgExternal\TgExternalEditService;
 use App\Services\TgExternal\TgExternalMessageService;
 use App\Services\TgVk\TgVkEditService;
 use App\Services\TgVk\TgVkMessageService;
+use App\Services\Broadcast\BroadcastMessageService;
+use App\Actions\Telegram\IsBroadcastTopic;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -91,6 +93,19 @@ class TelegramBotController
     public function bot_query(): void
     {
         $this->checkBotQuery();
+        
+        // Проверка на топик массовых рассылок (до определения платформы)
+        if ($this->dataHook->typeQuery === 'message' && 
+            $this->dataHook->typeSource === 'supergroup' && 
+            !$this->dataHook->isBot &&
+            IsBroadcastTopic::execute($this->dataHook->messageThreadId)) {
+            
+            // Это сообщение из топика массовых рассылок
+            (new BroadcastMessageService())->handle($this->dataHook);
+            echo 'ok';
+            return;
+        }
+        
         if ($this->dataHook->editedTopicStatus && $this->dataHook->typeSource === 'supergroup') {
             // Сохраняем кастомное название топика при ручном редактировании
             if ($this->botUser && 

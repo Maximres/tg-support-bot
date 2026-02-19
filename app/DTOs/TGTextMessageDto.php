@@ -23,6 +23,8 @@ use Spatie\LaravelData\Data;
  * @property string|null $photo
  * @property string|null $document
  * @property string|null $voice
+ * @property string|null $audio
+ * @property string|null $video
  * @property string|null $sticker
  * @property string|null $video_note
  * @property array|null  $media
@@ -51,6 +53,8 @@ class TGTextMessageDto extends Data
         public ?UploadedFile  $uploaded_file = null,
         public ?string        $uploaded_file_path = null,
         public ?string        $voice = null,
+        public ?string        $audio = null,
+        public ?string        $video = null,
         public ?string        $sticker = null,
         public ?string        $video_note = null,
         public ?array         $media = null,
@@ -75,6 +79,11 @@ class TGTextMessageDto extends Data
 
         if (!empty($dataMessage['token'])) {
             unset($dataMessage['token']);
+        }
+
+        // Валидация caption: обрезаем до 1024 символов (лимит Telegram)
+        if (!empty($dataMessage['caption']) && mb_strlen($dataMessage['caption']) > 1024) {
+            $dataMessage['caption'] = mb_substr($dataMessage['caption'], 0, 1024);
         }
 
         if (!empty($dataMessage['media'])) {
