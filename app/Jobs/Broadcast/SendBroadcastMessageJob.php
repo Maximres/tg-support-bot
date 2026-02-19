@@ -7,6 +7,7 @@ use App\DTOs\TGTextMessageDto;
 use App\Logging\LokiLogger;
 use App\Models\BotUser;
 use App\TelegramBot\TelegramMethods;
+use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\Log;
 
 class SendBroadcastMessageJob implements ShouldQueue
 {
+    use Batchable;
     use Dispatchable;
     use InteractsWithQueue;
     use Queueable;
@@ -43,6 +45,11 @@ class SendBroadcastMessageJob implements ShouldQueue
 
     public function handle(): void
     {
+        // Проверяем, не был ли batch отменен
+        if ($this->batch() && $this->batch()->cancelled()) {
+            return;
+        }
+
         try {
             $botUser = BotUser::find($this->botUserId);
 
