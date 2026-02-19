@@ -97,13 +97,27 @@ class TelegramBotController
         // Проверка на топик массовых рассылок (до определения платформы)
         if ($this->dataHook->typeQuery === 'message' && 
             $this->dataHook->typeSource === 'supergroup' && 
-            !$this->dataHook->isBot &&
-            IsBroadcastTopic::execute($this->dataHook->messageThreadId)) {
+            !$this->dataHook->isBot) {
             
-            // Это сообщение из топика массовых рассылок
-            (new BroadcastMessageService())->handle($this->dataHook);
-            echo 'ok';
-            return;
+            // Логируем для отладки
+            Log::debug('TelegramBotController: проверка на массовую рассылку', [
+                'message_thread_id' => $this->dataHook->messageThreadId,
+                'type_query' => $this->dataHook->typeQuery,
+                'type_source' => $this->dataHook->typeSource,
+                'is_bot' => $this->dataHook->isBot,
+            ]);
+            
+            if (IsBroadcastTopic::execute($this->dataHook->messageThreadId)) {
+                // Это сообщение из топика массовых рассылок
+                Log::info('TelegramBotController: запуск массовой рассылки', [
+                    'message_thread_id' => $this->dataHook->messageThreadId,
+                    'update_id' => $this->dataHook->updateId,
+                    'message_id' => $this->dataHook->messageId,
+                ]);
+                (new BroadcastMessageService())->handle($this->dataHook);
+                echo 'ok';
+                return;
+            }
         }
         
         if ($this->dataHook->editedTopicStatus && $this->dataHook->typeSource === 'supergroup') {

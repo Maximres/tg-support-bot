@@ -32,13 +32,20 @@ class BroadcastStatus extends Command
 
         // Проверяем конфигурацию
         $topicId = config('traffic_source.settings.telegram.broadcast_topic_id');
+        $envValue = env('TELEGRAM_BROADCAST_TOPIC_ID');
         
         $this->table(
             ['Параметр', 'Значение'],
             [
-                ['Конфигурация', $topicId ? "✓ Настроена (ID: {$topicId})" : "✗ Не настроена"],
+                ['Конфигурация (config)', $topicId ? "✓ Настроена (ID: {$topicId}, тип: " . gettype($topicId) . ")" : "✗ Не настроена"],
+                ['.env значение', $envValue ? "✓ Установлено ({$envValue})" : "✗ Не установлено"],
             ]
         );
+        
+        if ($topicId !== $envValue && $envValue) {
+            $this->warn("⚠ Внимание: значение в config не совпадает с .env!");
+            $this->comment("Выполните: php artisan config:clear");
+        }
 
         if (!$topicId) {
             $this->newLine();
