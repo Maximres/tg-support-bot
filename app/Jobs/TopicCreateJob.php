@@ -50,6 +50,12 @@ class TopicCreateJob implements ShouldQueue
         try {
             $this->botUser = BotUser::find($this->botUserId); // всегда свежие данные
 
+            // Убеждаемся, что порядковый номер присвоен
+            if ($this->botUser->sequential_number === null) {
+                $this->botUser->assignSequentialNumber();
+                $this->botUser->refresh();
+            }
+
             $topicName = $this->generateNameTopic($this->botUser);
 
             $response = $this->telegramMethods->sendQueryTelegram('createForumTopic', [
@@ -99,9 +105,12 @@ class TopicCreateJob implements ShouldQueue
                 return $botUser->getCustomTopicName();
             }
 
+            // Используем порядковый номер, если он присвоен, иначе fallback на chat_id
+            $displayId = $botUser->sequential_number ?? $botUser->chat_id;
+
             if ($botUser->platform === 'external_source') {
                 $source = ExternalUser::getSourceById($botUser->chat_id);
-                return "#{$botUser->chat_id} ({$source})";
+                return "#{$displayId} ({$source})";
             }
 
             // Получаем данные пользователя
@@ -110,8 +119,8 @@ class TopicCreateJob implements ShouldQueue
                 throw new \Exception('Name parts not found');
             }
 
-            // Формируем название: #ID Имя Фамилия +номер
-            $topicName = '#' . $botUser->chat_id;
+            // Формируем название: #ПорядковыйНомер Имя Фамилия +номер
+            $topicName = '#' . $displayId;
             
             $firstName = $nameParts['first_name'] ?? '';
             $lastName = $nameParts['last_name'] ?? '';
@@ -130,7 +139,9 @@ class TopicCreateJob implements ShouldQueue
 
             return $topicName;
         } catch (\Throwable $e) {
-            return '#' . $botUser->chat_id . ' (' . $botUser->platform . ')';
+            // Fallback на порядковый номер или chat_id
+            $displayId = $botUser->sequential_number ?? $botUser->chat_id;
+            return '#' . $displayId . ' (' . $botUser->platform . ')';
         }
     }
 

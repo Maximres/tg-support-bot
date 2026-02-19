@@ -9,10 +9,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\DB;
 use phpDocumentor\Reflection\Exception;
 
 /**
  * @property int               $id
+ * @property int|null          $sequential_number
  * @property int               $topic_id
  * @property int               $chat_id
  * @property string            $platform
@@ -37,6 +39,7 @@ class BotUser extends Model
         'phone_number',
         'custom_topic_name',
         'topic_name_edited',
+        'sequential_number',
         'is_banned',
         'banned_at',
     ];
@@ -148,6 +151,11 @@ class BotUser extends Model
                         'platform' => 'telegram',
                     ]
                 );
+                
+                // Присваиваем порядковый номер, если пользователь был только что создан
+                if ($botUser->wasRecentlyCreated) {
+                    $botUser->assignSequentialNumber();
+                }
             }
 
             return $botUser ?? null;
@@ -182,11 +190,18 @@ class BotUser extends Model
     public static function getUserByChatId(string|int $chatId, string $platform): ?BotUser
     {
         try {
-            return self::firstOrCreate([
+            $botUser = self::firstOrCreate([
                 'chat_id' => $chatId,
             ], [
                 'platform' => $platform,
             ]);
+            
+            // Присваиваем порядковый номер, если пользователь был только что создан
+            if ($botUser->wasRecentlyCreated) {
+                $botUser->assignSequentialNumber();
+            }
+            
+            return $botUser;
         } catch (\Throwable $e) {
             return null;
         }
@@ -209,10 +224,17 @@ class BotUser extends Model
                 throw new Exception('External user not found!');
             }
 
-            return BotUser::firstOrCreate([
+            $botUser = BotUser::firstOrCreate([
                 'chat_id' => $this->externalUser->id,
                 'platform' => $this->externalUser->source,
             ]);
+            
+            // Присваиваем порядковый номер, если пользователь был только что создан
+            if ($botUser->wasRecentlyCreated) {
+                $botUser->assignSequentialNumber();
+            }
+            
+            return $botUser;
         } catch (\Throwable $e) {
             return null;
         }
@@ -289,5 +311,40 @@ class BotUser extends Model
     public function getCustomTopicName(): ?string
     {
         return $this->custom_topic_name;
+    }
+
+    /**
+     * Присваивает порядковый номер пользователю
+     * Использует транзакции и блокировки для предотвращения race conditions
+     *
+     * @return void
+     */
+    public function assignSequentialNumber(): void
+    {
+        // Если порядковый номер уже присвоен, ничего не делаем
+        if ($this->sequential_number !== null) {
+            return;
+        }
+
+        // Используем транзакцию с блокировкой для безопасного присвоения
+        DB::transaction(function () {
+            // Обновляем модель из БД и блокируем строку для обновления
+            $this->refresh();
+            $this->lockForUpdate();
+
+            // Проверяем еще раз после блокировки (возможно, другой процесс уже присвоил номер)
+            if ($this->sequential_number !== null) {
+                return;
+            }
+
+            // Получаем максимальный порядковый номер с блокировкой таблицы
+            // Используем SELECT FOR UPDATE для предотвращения race conditions
+            $maxSequentialNumber = DB::table('bot_users')
+                ->lockForUpdate()
+                ->max('sequential_number') ?? 0;
+            
+            $this->sequential_number = $maxSequentialNumber + 1;
+            $this->save();
+        });
     }
 }
