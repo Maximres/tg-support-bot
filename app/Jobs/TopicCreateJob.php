@@ -53,7 +53,15 @@ class TopicCreateJob implements ShouldQueue
             // Убеждаемся, что порядковый номер присвоен
             if ($this->botUser->sequential_number === null) {
                 $this->botUser->assignSequentialNumber();
+                // assignSequentialNumber() уже делает refresh(), но перестраховываемся
                 $this->botUser->refresh();
+                
+                // Проверяем еще раз после присвоения
+                if ($this->botUser->sequential_number === null) {
+                    Log::warning('TopicCreateJob: не удалось присвоить порядковый номер', [
+                        'bot_user_id' => $this->botUserId,
+                    ]);
+                }
             }
 
             $topicName = $this->generateNameTopic($this->botUser);

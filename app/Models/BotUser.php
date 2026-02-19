@@ -9,7 +9,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use phpDocumentor\Reflection\Exception;
 
 /**
@@ -152,8 +154,9 @@ class BotUser extends Model
                     ]
                 );
                 
-                // Присваиваем порядковый номер, если пользователь был только что создан
-                if ($botUser->wasRecentlyCreated) {
+                // Присваиваем порядковый номер, если он еще не присвоен
+                // Проверяем sequential_number вместо wasRecentlyCreated для надежности
+                if ($botUser->sequential_number === null) {
                     $botUser->assignSequentialNumber();
                 }
             }
@@ -196,8 +199,9 @@ class BotUser extends Model
                 'platform' => $platform,
             ]);
             
-            // Присваиваем порядковый номер, если пользователь был только что создан
-            if ($botUser->wasRecentlyCreated) {
+            // Присваиваем порядковый номер, если он еще не присвоен
+            // Проверяем sequential_number вместо wasRecentlyCreated для надежности
+            if ($botUser->sequential_number === null) {
                 $botUser->assignSequentialNumber();
             }
             
@@ -229,8 +233,9 @@ class BotUser extends Model
                 'platform' => $this->externalUser->source,
             ]);
             
-            // Присваиваем порядковый номер, если пользователь был только что создан
-            if ($botUser->wasRecentlyCreated) {
+            // Присваиваем порядковый номер, если он еще не присвоен
+            // Проверяем sequential_number вместо wasRecentlyCreated для надежности
+            if ($botUser->sequential_number === null) {
                 $botUser->assignSequentialNumber();
             }
             
@@ -316,6 +321,7 @@ class BotUser extends Model
     /**
      * Присваивает порядковый номер пользователю
      * Использует транзакции и блокировки для предотвращения race conditions
+     * Обрабатывает edge cases: deadlocks, unique constraint violations, удаление пользователя
      *
      * @return void
      */
@@ -326,25 +332,100 @@ class BotUser extends Model
             return;
         }
 
-        // Используем транзакцию с блокировкой для безопасного присвоения
-        DB::transaction(function () {
-            // Обновляем модель из БД и блокируем строку для обновления
-            $this->refresh();
-            $this->lockForUpdate();
+        $attempts = 0;
+        $maxAttempts = 3;
+        $maxSequentialNumber = 4294967295; // Максимум для unsignedInteger
 
-            // Проверяем еще раз после блокировки (возможно, другой процесс уже присвоил номер)
-            if ($this->sequential_number !== null) {
+        while ($attempts < $maxAttempts) {
+            try {
+                // Используем транзакцию с блокировкой для безопасного присвоения
+                DB::transaction(function () use ($maxSequentialNumber) {
+                    // Обновляем модель из БД и блокируем строку для обновления
+                    $this->refresh();
+                    $this->lockForUpdate();
+
+                    // Проверяем еще раз после блокировки (возможно, другой процесс уже присвоил номер)
+                    if ($this->sequential_number !== null) {
+                        return;
+                    }
+
+                    // Получаем максимальный порядковый номер с блокировкой таблицы
+                    // Используем SELECT FOR UPDATE для предотвращения race conditions
+                    $currentMax = DB::table('bot_users')
+                        ->lockForUpdate()
+                        ->max('sequential_number') ?? 0;
+
+                    // Проверяем, не достигнут ли максимум
+                    if ($currentMax >= $maxSequentialNumber) {
+                        throw new \Exception('Достигнут максимальный порядковый номер (' . $maxSequentialNumber . ')');
+                    }
+
+                    $this->sequential_number = $currentMax + 1;
+                    $this->save();
+                });
+
+                // Обновляем модель из БД после транзакции, чтобы получить актуальное значение
+                $this->refresh();
+                break;
+            } catch (QueryException $e) {
+                // Обработка deadlock (40001) или unique constraint violation (23000)
+                $isDeadlock = $e->getCode() === '40001';
+                $isUniqueViolation = $e->getCode() === '23000' || str_contains($e->getMessage(), 'Duplicate entry');
+
+                if (($isDeadlock || $isUniqueViolation) && $attempts < $maxAttempts - 1) {
+                    $attempts++;
+                    // Exponential backoff: 100ms, 200ms, 400ms
+                    usleep(100000 * $attempts);
+
+                    // Обновляем модель перед повторной попыткой
+                    try {
+                        $this->refresh();
+                        // Если номер уже присвоен другим процессом, выходим
+                        if ($this->sequential_number !== null) {
+                            return;
+                        }
+                    } catch (\Throwable $refreshException) {
+                        // Пользователь мог быть удален
+                        Log::warning('assignSequentialNumber: не удалось обновить модель перед retry', [
+                            'bot_user_id' => $this->id,
+                            'error' => $refreshException->getMessage(),
+                        ]);
+                        return;
+                    }
+
+                    continue;
+                }
+
+                // Если это не deadlock/unique violation или превышено количество попыток
+                Log::error('assignSequentialNumber: ошибка при присвоении порядкового номера', [
+                    'bot_user_id' => $this->id,
+                    'attempt' => $attempts + 1,
+                    'error_code' => $e->getCode(),
+                    'error_message' => $e->getMessage(),
+                ]);
+                throw $e;
+            } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+                // Пользователь был удален между проверкой и сохранением
+                Log::warning('assignSequentialNumber: пользователь был удален', [
+                    'bot_user_id' => $this->id ?? 'unknown',
+                ]);
                 return;
+            } catch (\Throwable $e) {
+                // Другие ошибки (например, достижение максимума)
+                Log::error('assignSequentialNumber: неожиданная ошибка', [
+                    'bot_user_id' => $this->id,
+                    'error' => $e->getMessage(),
+                ]);
+                throw $e;
             }
+        }
 
-            // Получаем максимальный порядковый номер с блокировкой таблицы
-            // Используем SELECT FOR UPDATE для предотвращения race conditions
-            $maxSequentialNumber = DB::table('bot_users')
-                ->lockForUpdate()
-                ->max('sequential_number') ?? 0;
-            
-            $this->sequential_number = $maxSequentialNumber + 1;
-            $this->save();
-        });
+        // Если не удалось присвоить номер после всех попыток
+        if ($this->sequential_number === null && $attempts >= $maxAttempts) {
+            Log::error('assignSequentialNumber: не удалось присвоить порядковый номер после всех попыток', [
+                'bot_user_id' => $this->id,
+                'attempts' => $maxAttempts,
+            ]);
+        }
     }
 }
