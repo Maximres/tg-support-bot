@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Actions\Ai\EditAiMessage;
 use App\Actions\Telegram\BannedContactMessage;
 use App\Actions\Telegram\CloseTopic;
+use App\Actions\Telegram\RenameTopic;
+use App\Actions\Telegram\RestoreTopicName;
 use App\Actions\Telegram\SendAiAnswerMessage;
 use App\Actions\Telegram\SendBannedMessage;
 use App\Actions\Telegram\SendContactMessage;
@@ -170,6 +172,10 @@ class TelegramBotController
                         (new SendStartMessage())->execute($this->dataHook);
                     } elseif (str_contains($this->dataHook->text, '/ai_generate') && $this->isSupergroup()) {
                         (new SendAiAnswerMessage())->execute($this->dataHook);
+                    } elseif (str_starts_with($this->dataHook->text, '/rename_topic') && $this->isSupergroup()) {
+                        (new RenameTopic())->execute($this->dataHook);
+                    } elseif (str_starts_with(trim($this->dataHook->text ?? ''), '/restore_topic_name') && $this->isSupergroup()) {
+                        (new RestoreTopicName())->execute($this->dataHook);
                     } else {
                         (new TgMessageService($this->dataHook))->handleUpdate();
                     }

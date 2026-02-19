@@ -319,6 +319,22 @@ class BotUser extends Model
     }
 
     /**
+     * Очищает кастомное название топика
+     *
+     * @return void
+     */
+    public function clearCustomTopicName(): void
+    {
+        // Обновляем модель только если она уже сохранена в БД
+        if ($this->exists) {
+            $this->refresh();
+        }
+        $this->custom_topic_name = null;
+        $this->topic_name_edited = false;
+        $this->save();
+    }
+
+    /**
      * Присваивает порядковый номер пользователю
      * Использует транзакции и блокировки для предотвращения race conditions
      * Обрабатывает edge cases: deadlocks, unique constraint violations, удаление пользователя
