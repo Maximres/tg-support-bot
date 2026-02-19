@@ -62,12 +62,35 @@ abstract class AbstractSendMessageJob implements ShouldQueue
      */
     protected function updateTopic(BotUser $botUser, string $typeMessage): void
     {
+        // Edge case: проверяем, что topic_id не null
+        if (empty($botUser->topic_id)) {
+            Log::warning('updateTopic: topic_id пустой, пропускаем обновление иконки', [
+                'bot_user_id' => $botUser->id ?? null,
+                'type_message' => $typeMessage,
+            ]);
+            return;
+        }
+
         // Если название было изменено вручную, обновляем только иконку
+        $targetIcon = __('icons.' . $typeMessage);
+        
+        // Edge case: проверяем, что иконка не пустая
+        if (empty($targetIcon)) {
+            Log::warning('updateTopic: иконка пустая, пропускаем обновление', [
+                'bot_user_id' => $botUser->id ?? null,
+                'type_message' => $typeMessage,
+                'topic_id' => $botUser->topic_id,
+            ]);
+            return;
+        }
+        
+        // Добавляем небольшую задержку перед обновлением иконки для предотвращения race conditions
+        // Это помогает избежать конфликтов при параллельных обновлениях
         $params = [
             'methodQuery' => 'editForumTopic',
             'chat_id' => config('traffic_source.settings.telegram.group_id'),
             'message_thread_id' => $botUser->topic_id,
-            'icon_custom_emoji_id' => __('icons.' . $typeMessage),
+            'icon_custom_emoji_id' => $targetIcon,
         ];
 
         // Не обновляем название, если оно было изменено вручную
@@ -76,7 +99,10 @@ abstract class AbstractSendMessageJob implements ShouldQueue
             // Но по умолчанию обновляем только иконку
         }
 
-        SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from($params));
+        // Добавляем задержку перед отправкой для предотвращения конфликтов
+        // Используем delay() для отложенной отправки
+        SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from($params))
+            ->delay(now()->addSeconds(1));
     }
 
     protected function telegramResponseHandler(TelegramAnswerDto $response): void

@@ -70,12 +70,21 @@ class TgExternalEditService extends FromTgEditService
                 ]);
             }
 
-            SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from([
-                'methodQuery' => 'editForumTopic',
-                'chat_id' => config('traffic_source.settings.telegram.group_id'),
-                'message_thread_id' => $this->botUser->topic_id,
-                'icon_custom_emoji_id' => __('icons.outgoing'),
-            ]));
+            // Edge case: проверяем, что topic_id не null перед обновлением иконки
+            if (!empty($this->botUser->topic_id)) {
+                $iconOutgoing = __('icons.outgoing');
+                
+                // Edge case: проверяем, что иконка не пустая
+                if (!empty($iconOutgoing)) {
+                    // Добавляем задержку для предотвращения конфликтов при параллельных обновлениях
+                    SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from([
+                        'methodQuery' => 'editForumTopic',
+                        'chat_id' => config('traffic_source.settings.telegram.group_id'),
+                        'message_thread_id' => $this->botUser->topic_id,
+                        'icon_custom_emoji_id' => $iconOutgoing,
+                    ]))->delay(now()->addSeconds(1));
+                }
+            }
         } catch (\Throwable $e) {
             (new LokiLogger())->logException($e);
         }
