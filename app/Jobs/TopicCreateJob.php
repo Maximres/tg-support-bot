@@ -110,11 +110,22 @@ class TopicCreateJob implements ShouldQueue
         try {
             // Если есть кастомное название, используем его
             if ($botUser->hasCustomTopicName()) {
+                Log::info('TopicCreateJob: используется кастомное название топика', [
+                    'bot_user_id' => $botUser->id,
+                    'custom_topic_name' => $botUser->getCustomTopicName(),
+                ]);
                 return $botUser->getCustomTopicName();
             }
 
             // Используем порядковый номер, если он присвоен, иначе fallback на chat_id
             $displayId = $botUser->sequential_number ?? $botUser->chat_id;
+            
+            Log::info('TopicCreateJob: генерация названия топика', [
+                'bot_user_id' => $botUser->id,
+                'sequential_number' => $botUser->sequential_number,
+                'chat_id' => $botUser->chat_id,
+                'display_id' => $displayId,
+            ]);
 
             if ($botUser->platform === 'external_source') {
                 $source = ExternalUser::getSourceById($botUser->chat_id);

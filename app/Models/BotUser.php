@@ -349,10 +349,10 @@ class BotUser extends Model
                         return;
                     }
 
-                    // Получаем максимальный порядковый номер с блокировкой таблицы
-                    // Используем SELECT FOR UPDATE для предотвращения race conditions
+                    // Получаем максимальный порядковый номер
+                    // В PostgreSQL нельзя использовать FOR UPDATE с агрегатными функциями
+                    // Используем отдельный запрос для получения max, затем блокируем таблицу
                     $currentMax = DB::table('bot_users')
-                        ->lockForUpdate()
                         ->max('sequential_number') ?? 0;
 
                     // Проверяем, не достигнут ли максимум

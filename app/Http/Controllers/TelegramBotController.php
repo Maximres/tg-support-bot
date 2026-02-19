@@ -20,6 +20,7 @@ use App\Services\TgExternal\TgExternalMessageService;
 use App\Services\TgVk\TgVkEditService;
 use App\Services\TgVk\TgVkMessageService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class TelegramBotController
 {
@@ -145,6 +146,16 @@ class TelegramBotController
      */
     private function controllerPlatformTg(): void
     {
+        // Проверяем что botUser существует
+        if (!$this->botUser) {
+            Log::warning('TelegramBotController: botUser is null', [
+                'typeSource' => $this->dataHook->typeSource,
+                'chatId' => $this->dataHook->chatId,
+                'messageThreadId' => $this->dataHook->messageThreadId ?? null,
+            ]);
+            die();
+        }
+        
         if ($this->botUser->isBanned() && $this->dataHook->typeSource === 'private') {
             (new SendBannedMessage())->execute($this->botUser);
             die();
