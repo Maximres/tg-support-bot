@@ -203,7 +203,7 @@ class UpdateTopicName
                 return '#' . $displayId . ' (' . $botUser->platform . ')';
             }
 
-            // Формируем название: #ПорядковыйНомер FullName +phone email
+            // Формируем название: #ID ФИО ТЕЛЕФОН (без email)
             $topicName = '#' . $displayId;
 
             // Используем full_name из БД, если доступен, иначе fallback на данные из Telegram
@@ -227,22 +227,7 @@ class UpdateTopicName
                 $topicName .= ' ' . $botUser->phone_number;
             }
 
-            // Добавляем email, если доступен (с учетом ограничения длины)
-            if (!empty($botUser->email)) {
-                // Проверяем, не превысит ли добавление email лимит в 128 символов
-                $potentialName = $topicName . ' ' . $botUser->email;
-                if (mb_strlen($potentialName) <= 128) {
-                    $topicName = $potentialName;
-                } else {
-                    // Если превышает, обрезаем email или не добавляем его
-                    $availableLength = 128 - mb_strlen($topicName) - 1; // -1 для пробела
-                    if ($availableLength > 10) { // Минимум 10 символов для email
-                        $truncatedEmail = mb_substr($botUser->email, 0, $availableLength);
-                        $topicName .= ' ' . $truncatedEmail;
-                    }
-                    // Если места недостаточно, просто не добавляем email
-                }
-            }
+            // Email не добавляем в название топика, он отображается в контактной информации
 
             return $topicName;
         } catch (\Throwable $e) {

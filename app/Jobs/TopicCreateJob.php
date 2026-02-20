@@ -147,22 +147,25 @@ class TopicCreateJob implements ShouldQueue
                 return "#{$displayId} ({$source})";
             }
 
-            // Получаем данные пользователя
-            $nameParts = $this->getPartsGenerateName($botUser->chat_id);
-            if (empty($nameParts)) {
-                throw new \Exception('Name parts not found');
-            }
-
-            // Формируем название: #ПорядковыйНомер Имя Фамилия +номер
+            // Формируем название: #ID ФИО ТЕЛЕФОН
             $topicName = '#' . $displayId;
-            
-            $firstName = $nameParts['first_name'] ?? '';
-            $lastName = $nameParts['last_name'] ?? '';
-            
-            if (!empty($firstName) || !empty($lastName)) {
-                $fullName = trim($firstName . ' ' . $lastName);
-                if (!empty($fullName)) {
-                    $topicName .= ' ' . $fullName;
+
+            // Используем full_name из БД, если доступен, иначе получаем из Telegram API
+            if (!empty($botUser->full_name)) {
+                $topicName .= ' ' . $botUser->full_name;
+            } else {
+                // Fallback на данные из Telegram API
+                $nameParts = $this->getPartsGenerateName($botUser->chat_id);
+                if (!empty($nameParts)) {
+                    $firstName = $nameParts['first_name'] ?? '';
+                    $lastName = $nameParts['last_name'] ?? '';
+                    
+                    if (!empty($firstName) || !empty($lastName)) {
+                        $fullName = trim($firstName . ' ' . $lastName);
+                        if (!empty($fullName)) {
+                            $topicName .= ' ' . $fullName;
+                        }
+                    }
                 }
             }
 
@@ -170,6 +173,8 @@ class TopicCreateJob implements ShouldQueue
             if (!empty($botUser->phone_number)) {
                 $topicName .= ' ' . $botUser->phone_number;
             }
+
+            // Email не добавляем в название топика, он отображается в контактной информации
 
             return $topicName;
         } catch (\Throwable $e) {

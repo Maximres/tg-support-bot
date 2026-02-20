@@ -35,7 +35,7 @@ class SendContactMessage
             'methodQuery' => 'sendMessage',
             'chat_id' => config('traffic_source.settings.telegram.group_id'),
             'message_thread_id' => $botUser->topic_id,
-            'text' => $this->createContactMessage($botUser->chat_id, $botUser->platform, $botUser->phone_number),
+            'text' => $this->createContactMessage($botUser->chat_id, $botUser->platform, $botUser->phone_number, $botUser->full_name, $botUser->email),
             'parse_mode' => 'html',
             'reply_markup' => [
                 'inline_keyboard' => $this->getKeyboard($botUser),
@@ -48,10 +48,13 @@ class SendContactMessage
      *
      * @param int    $chatId
      * @param string $platform
+     * @param string|null $phoneNumber
+     * @param string|null $fullName
+     * @param string|null $email
      *
      * @return string
      */
-    public function createContactMessage(int $chatId, string $platform, ?string $phoneNumber = null): string
+    public function createContactMessage(int $chatId, string $platform, ?string $phoneNumber = null, ?string $fullName = null, ?string $email = null): string
     {
         try {
             $textMessage = "<b>КОНТАКТНАЯ ИНФОРМАЦИЯ</b> \n";
@@ -67,9 +70,19 @@ class SendContactMessage
                 }
             }
             
+            // Добавляем ФИО, если есть
+            if (!empty($fullName)) {
+                $textMessage .= "ФИО: <b>{$fullName}</b> \n";
+            }
+            
             // Добавляем номер телефона, если он есть
             if (!empty($phoneNumber)) {
                 $textMessage .= "Телефон: <b>{$phoneNumber}</b> \n";
+            }
+            
+            // Добавляем email, если он есть
+            if (!empty($email)) {
+                $textMessage .= "Email: <b>{$email}</b> \n";
             }
             
             return $textMessage;
