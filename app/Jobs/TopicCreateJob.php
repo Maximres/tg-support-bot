@@ -7,6 +7,7 @@ use App\Actions\Telegram\SendContactMessage;
 use App\Logging\LokiLogger;
 use App\Models\BotUser;
 use App\Models\ExternalUser;
+use App\Models\Message;
 use App\TelegramBot\TelegramMethods;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -82,11 +83,25 @@ class TopicCreateJob implements ShouldQueue
                 $this->botUser->topic_id = $response->message_thread_id;
                 $this->botUser->save();
 
+                // Отправляем контактное сообщение через UpdateContactMessage для сохранения message_id
+                // Это должно быть сделано до обновления названия, чтобы иконка не менялась
+                (new \App\Actions\Telegram\UpdateContactMessage())->execute($this->botUser);
+
                 // Обновляем название топика с учетом данных регистрации (full_name, email)
                 // Это особенно важно, если топик создается после завершения регистрации
+                // Делаем это после отправки контактного сообщения, чтобы иконка не менялась
                 if ($this->botUser->isRegistrationCompleted()) {
                     try {
-                        (new \App\Actions\Telegram\UpdateTopicName())->execute($this->botUser);
+                        // Проверяем, были ли сообщения от клиента перед обновлением названия
+                        $hasIncomingMessages = \App\Models\Message::where('bot_user_id', $this->botUser->id)
+                            ->where('message_type', 'incoming')
+                            ->exists();
+                        
+                        // Обновляем название только если были сообщения от клиента
+                        // Если сообщений не было, название уже правильное (создано при создании топика)
+                        if ($hasIncomingMessages) {
+                            (new \App\Actions\Telegram\UpdateTopicName())->execute($this->botUser);
+                        }
                     } catch (\Throwable $e) {
                         // Edge case: ошибка обновления названия не должна прерывать создание топика
                         Log::warning('TopicCreateJob: ошибка обновления названия топика после создания', [
@@ -96,9 +111,6 @@ class TopicCreateJob implements ShouldQueue
                         ]);
                     }
                 }
-
-                // Отправляем контактное сообщение через UpdateContactMessage для сохранения message_id
-                (new \App\Actions\Telegram\UpdateContactMessage())->execute($this->botUser);
                 return;
             }
 

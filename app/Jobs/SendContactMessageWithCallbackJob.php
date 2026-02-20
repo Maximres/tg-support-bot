@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\DTOs\TGTextMessageDto;
+use App\Jobs\SendTelegramSimpleQueryJob;
 use App\Logging\LokiLogger;
 use App\Models\BotUser;
+use App\Models\Message;
 use App\TelegramBot\TelegramMethods;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -53,6 +55,30 @@ class SendContactMessageWithCallbackJob implements ShouldQueue
                 // Сохраняем message_id в BotUser
                 $botUser->contact_info_message_id = $response->message_id;
                 $botUser->save();
+
+                // Если от клиента не было сообщений, устанавливаем иконку 'incoming'
+                // (клиент ввел данные и ожидает от нас сообщения)
+                $hasIncomingMessages = Message::where('bot_user_id', $botUser->id)
+                    ->where('message_type', 'incoming')
+                    ->exists();
+
+                if (!$hasIncomingMessages && !empty($botUser->topic_id)) {
+                    $iconIncoming = __('icons.incoming');
+                    if (!empty($iconIncoming)) {
+                        // Устанавливаем иконку 'incoming' с небольшой задержкой
+                        SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from([
+                            'methodQuery' => 'editForumTopic',
+                            'chat_id' => config('traffic_source.settings.telegram.group_id'),
+                            'message_thread_id' => $botUser->topic_id,
+                            'icon_custom_emoji_id' => $iconIncoming,
+                        ]))->delay(now()->addSeconds(1));
+                        
+                        Log::info('SendContactMessageWithCallbackJob: установлена иконка incoming после отправки контактного сообщения', [
+                            'bot_user_id' => $botUser->id,
+                            'topic_id' => $botUser->topic_id,
+                        ]);
+                    }
+                }
 
                 Log::info('SendContactMessageWithCallbackJob: контактное сообщение отправлено, message_id сохранен', [
                     'bot_user_id' => $botUser->id,
