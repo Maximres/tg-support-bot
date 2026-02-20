@@ -86,6 +86,7 @@ class DataValidator
     /**
      * Валидация телефона
      * Edge cases: неправильный формат, пустое значение, нормализация формата
+     * Принимает любые международные номера
      *
      * @param string|null $phone
      *
@@ -114,37 +115,31 @@ class DataValidator
             ];
         }
 
-        // Проверка формата: должен начинаться с + и содержать 9-15 цифр
-        // Поддержка белорусских номеров: +375XXXXXXXXX
-        if (!preg_match('/^\+375\d{9}$/', $normalized) && 
-            !preg_match('/^\+?\d{9,15}$/', $normalized)) {
-            // Если нет +, добавляем его для белорусских номеров
-            if (preg_match('/^375\d{9}$/', $normalized)) {
-                $normalized = '+' . $normalized;
-            } elseif (preg_match('/^\d{9,15}$/', $normalized)) {
-                // Если номер без кода страны, добавляем +375 для Беларуси
-                if (strlen($normalized) === 9) {
-                    $normalized = '+375' . $normalized;
-                } else {
-                    $normalized = '+' . $normalized;
-                }
-            } else {
-                return [
-                    'valid' => false,
-                    'error' => __('registration.validation.phone_invalid'),
-                    'normalized' => null,
-                ];
-            }
-            
-            // Проверяем формат после нормализации
-            if (!preg_match('/^\+375\d{9}$/', $normalized) && 
-                !preg_match('/^\+?\d{9,15}$/', $normalized)) {
-                return [
-                    'valid' => false,
-                    'error' => __('registration.validation.phone_invalid'),
-                    'normalized' => null,
-                ];
-            }
+        // Если номер начинается с цифры (без +), добавляем +
+        if (preg_match('/^\d/', $normalized)) {
+            $normalized = '+' . $normalized;
+        }
+
+        // Проверка формата: должен начинаться с + и содержать минимум 10 цифр (код страны + номер)
+        // Международные номера обычно содержат от 10 до 15 цифр (включая код страны)
+        // Формат: +[код страны][номер]
+        $digitsOnly = preg_replace('/[^\d]/', '', $normalized);
+        
+        if (!preg_match('/^\+/', $normalized)) {
+            return [
+                'valid' => false,
+                'error' => __('registration.validation.phone_invalid'),
+                'normalized' => null,
+            ];
+        }
+
+        // Проверяем количество цифр (минимум 10 для международного номера)
+        if (strlen($digitsOnly) < 10 || strlen($digitsOnly) > 15) {
+            return [
+                'valid' => false,
+                'error' => __('registration.validation.phone_invalid'),
+                'normalized' => null,
+            ];
         }
 
         return [
