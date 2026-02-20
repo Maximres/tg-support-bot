@@ -6,6 +6,7 @@ use App\Actions\Telegram\UpdateTopicName;
 use App\DTOs\TelegramUpdateDto;
 use App\DTOs\TGTextMessageDto;
 use App\Jobs\SendMessage\SendTelegramMessageJob;
+use App\Jobs\TopicCreateJob;
 use App\Logging\LokiLogger;
 use App\Models\BotUser;
 use App\Services\Registration\DataValidator;
@@ -318,8 +319,16 @@ class HandleRegistrationFlow
             return true;
         }
 
-        // Обновляем название топика при сохранении email
-        $this->updateTopicName($botUser);
+        // Обновляем модель из БД для получения актуальных данных
+        $botUser->refresh();
+
+        // Edge case: создаем топик после завершения регистрации, если его еще нет
+        if (empty($botUser->topic_id)) {
+            $this->createTopicAfterRegistration($botUser);
+        } else {
+            // Обновляем название топика при сохранении email
+            $this->updateTopicName($botUser);
+        }
 
         // Завершение регистрации
         $this->registrationService->clearState($update->chatId);
@@ -618,6 +627,35 @@ class HandleRegistrationFlow
             $messageParamsDTO,
             'outgoing'
         );
+    }
+
+    /**
+     * Создать топик после завершения регистрации
+     * Edge case: ошибка создания топика не должна прерывать регистрацию
+     *
+     * @param BotUser $botUser
+     *
+     * @return void
+     */
+    private function createTopicAfterRegistration(BotUser $botUser): void
+    {
+        try {
+            // Создаем топик через очередь
+            TopicCreateJob::dispatch($botUser->id);
+            
+            Log::info('HandleRegistrationFlow: создание топика после завершения регистрации запланировано', [
+                'bot_user_id' => $botUser->id ?? null,
+            ]);
+            
+            // После создания топика название будет обновлено автоматически через UpdateTopicName
+            // в TopicCreateJob или при следующем сообщении от пользователя
+        } catch (\Throwable $e) {
+            // Edge case: ошибка создания топика не должна прерывать регистрацию
+            Log::warning('HandleRegistrationFlow: ошибка создания топика после регистрации', [
+                'bot_user_id' => $botUser->id ?? null,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

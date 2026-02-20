@@ -77,6 +77,21 @@ class TopicCreateJob implements ShouldQueue
                 $this->botUser->topic_id = $response->message_thread_id;
                 $this->botUser->save();
 
+                // Обновляем название топика с учетом данных регистрации (full_name, email)
+                // Это особенно важно, если топик создается после завершения регистрации
+                if ($this->botUser->isRegistrationCompleted()) {
+                    try {
+                        (new \App\Actions\Telegram\UpdateTopicName())->execute($this->botUser);
+                    } catch (\Throwable $e) {
+                        // Edge case: ошибка обновления названия не должна прерывать создание топика
+                        Log::warning('TopicCreateJob: ошибка обновления названия топика после создания', [
+                            'bot_user_id' => $this->botUser->id ?? null,
+                            'topic_id' => $this->botUser->topic_id ?? null,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+
                 (new SendContactMessage())->execute($this->botUser);
                 return;
             }
