@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Actions\Telegram\DeleteForumTopic;
 use App\Models\BotUser;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 class DeleteTopic extends Command
 {
@@ -93,30 +94,112 @@ class DeleteTopic extends Command
             $this->info("Шаг 1: Топик не найден в БД (topic_id пустой), пропускаем удаление через API");
         }
 
-        // Шаг 2: Очищаем topic_id в БД
-        // Edge case: обновляем модель перед сохранением на случай изменений
+        // Шаг 2: Удаляем связанные данные клиента
+        // Edge case: блокируем строку для предотвращения конкурентного удаления
         $botUser->refresh();
         
-        // Edge case: проверяем, что пользователь все еще существует перед сохранением
+        // Edge case: проверяем, что пользователь все еще существует перед удалением
         if (!$botUser->exists) {
-            $this->error('Пользователь был удален из базы данных перед сохранением');
+            $this->error('Пользователь был удален из базы данных перед удалением');
             return Command::FAILURE;
         }
 
-        $this->info("Шаг 2: Очистка topic_id в базе данных...");
-        $botUser->topic_id = null;
+        $this->info("Шаг 2: Удаление связанных данных клиента...");
         
         try {
-            $botUser->save();
-            $this->info("✓ topic_id очищен в БД");
+            DB::beginTransaction();
+
+            // Edge case: блокируем строку для предотвращения конкурентного удаления
+            // Используем lockForUpdate() чтобы другие процессы не могли удалить этого пользователя одновременно
+            $botUser = BotUser::where('id', $botUser->id)->lockForUpdate()->first();
+            
+            if (!$botUser) {
+                DB::rollBack();
+                $this->error('Пользователь был удален другим процессом');
+                return Command::FAILURE;
+            }
+
+            // Загружаем связи перед удалением
+            $botUser->load(['aiCondition', 'externalUser']);
+
+            // Edge case: удаляем AI условие вручную (нет каскадного удаления)
+            // Если удаление не удастся, транзакция откатится
+            if ($botUser->aiCondition) {
+                try {
+                    $botUser->aiCondition->delete();
+                    $this->info("✓ AI условие удалено");
+                } catch (\Throwable $e) {
+                    DB::rollBack();
+                    $this->error("✗ Ошибка при удалении AI условия: {$e->getMessage()}");
+                    return Command::FAILURE;
+                }
+            }
+
+            // Edge case: удаляем ExternalUser с проверкой на race condition
+            // ExternalUser связан через chat_id = external_user.id
+            // Проверяем, используется ли этот external_user другими bot_users
+            $externalUser = $botUser->externalUser;
+            if ($externalUser) {
+                // Edge case: проверяем снова внутри транзакции с блокировкой
+                // чтобы избежать race condition - между проверкой и удалением может появиться новый BotUser
+                $otherBotUsers = BotUser::where('chat_id', $externalUser->id)
+                    ->where('id', '!=', $botUser->id)
+                    ->lockForUpdate()
+                    ->count();
+                
+                if ($otherBotUsers === 0) {
+                    try {
+                        $externalUser->delete();
+                        $this->info("✓ ExternalUser удален");
+                    } catch (\Throwable $e) {
+                        DB::rollBack();
+                        $this->error("✗ Ошибка при удалении ExternalUser: {$e->getMessage()}");
+                        return Command::FAILURE;
+                    }
+                } else {
+                    $this->warn("⚠ ExternalUser не удален, используется другими пользователями ({$otherBotUsers})");
+                }
+            }
+
+            // Edge case: сохраняем ID перед удалением для логирования
+            // После delete() модель может быть недоступна
+            $botUserId = $botUser->id;
+            $botUserChatId = $botUser->chat_id;
+            $botUserSequentialNumber = $botUser->sequential_number;
+
+            // Удаляем сам BotUser
+            // Это автоматически удалит связанные messages и ai_messages благодаря каскадному удалению
+            try {
+                $botUser->delete();
+                $this->info("✓ BotUser удален (ID: {$botUserId}, Chat ID: {$botUserChatId})");
+                if ($botUserSequentialNumber) {
+                    $this->info("  Порядковый номер {$botUserSequentialNumber} освобожден");
+                }
+                $this->info("✓ Сообщения и AI сообщения удалены автоматически (каскадное удаление)");
+            } catch (\Throwable $e) {
+                DB::rollBack();
+                $this->error("✗ Ошибка при удалении BotUser: {$e->getMessage()}");
+                return Command::FAILURE;
+            }
+
+            DB::commit();
+        } catch (\Illuminate\Database\QueryException $e) {
+            DB::rollBack();
+            // Edge case: обработка специфичных ошибок БД
+            if ($e->getCode() === '40001') { // Deadlock
+                $this->error("✗ Обнаружен deadlock при удалении. Попробуйте выполнить команду снова.");
+            } else {
+                $this->error("✗ Ошибка БД при удалении данных клиента: {$e->getMessage()}");
+            }
+            return Command::FAILURE;
         } catch (\Throwable $e) {
-            $this->error("✗ Ошибка при сохранении в БД: {$e->getMessage()}");
+            DB::rollBack();
+            $this->error("✗ Ошибка при удалении данных клиента: {$e->getMessage()}");
             return Command::FAILURE;
         }
 
         $this->newLine();
-        $this->info("✅ Топик успешно удален!");
-        $this->info("При следующем сообщении от клиента будет автоматически создан новый топик.");
+        $this->info("✅ Топик и вся информация о клиенте успешно удалены!");
 
         return Command::SUCCESS;
     }
