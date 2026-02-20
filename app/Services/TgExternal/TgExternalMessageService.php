@@ -2,6 +2,7 @@
 
 namespace App\Services\TgExternal;
 
+use App\Actions\Telegram\UpdateTopicName;
 use App\DTOs\External\ExternalMessageAnswerDto;
 use App\DTOs\External\ExternalMessageResponseDto;
 use App\DTOs\Redis\WebhookMessageDto;
@@ -13,6 +14,7 @@ use App\Jobs\SendWebhookMessage;
 use App\Logging\LokiLogger;
 use App\Models\Message;
 use App\Services\ActionService\Send\FromTgMessageService;
+use Illuminate\Support\Facades\Log;
 
 class TgExternalMessageService extends FromTgMessageService
 {
@@ -71,6 +73,19 @@ class TgExternalMessageService extends FromTgMessageService
                 if (!empty($contactData['phone_number']) && $this->botUser) {
                     $this->botUser->phone_number = $contactData['phone_number'];
                     $this->botUser->save();
+
+                    // Обновляем название топика, если номер был сохранен
+                    try {
+                        // Обновляем модель из БД для получения актуальных данных
+                        $this->botUser->refresh();
+                        (new UpdateTopicName())->execute($this->botUser);
+                    } catch (\Throwable $e) {
+                        // Edge case: ошибки при обновлении топика не должны ломать обработку контакта
+                        Log::warning('TgExternalMessageService: ошибка при обновлении названия топика', [
+                            'bot_user_id' => $this->botUser->id ?? null,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
                 }
 
                 $textMessage = "Контакт: \n";

@@ -2,6 +2,7 @@
 
 namespace App\Services\TgVk;
 
+use App\Actions\Telegram\UpdateTopicName;
 use App\Actions\Vk\GetMessagesUploadServerVk;
 use App\Actions\Vk\SaveFileVk;
 use App\Actions\Vk\UploadFileVk;
@@ -12,6 +13,7 @@ use App\Helpers\TelegramHelper;
 use App\Jobs\SendMessage\SendVkMessageJob;
 use App\Logging\LokiLogger;
 use App\Services\ActionService\Send\FromTgMessageService;
+use Illuminate\Support\Facades\Log;
 
 class TgVkMessageService extends FromTgMessageService
 {
@@ -171,6 +173,19 @@ class TgVkMessageService extends FromTgMessageService
         if (!empty($contactData['phone_number']) && $this->botUser) {
             $this->botUser->phone_number = $contactData['phone_number'];
             $this->botUser->save();
+
+            // Обновляем название топика, если номер был сохранен
+            try {
+                // Обновляем модель из БД для получения актуальных данных
+                $this->botUser->refresh();
+                (new UpdateTopicName())->execute($this->botUser);
+            } catch (\Throwable $e) {
+                // Edge case: ошибки при обновлении топика не должны ломать обработку контакта
+                Log::warning('TgVkMessageService::sendContact: ошибка при обновлении названия топика', [
+                    'bot_user_id' => $this->botUser->id ?? null,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         $textMessage = "Контакт: \n";

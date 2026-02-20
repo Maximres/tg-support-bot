@@ -31,9 +31,20 @@ class SendStartMessage
             $messageParamsDTO = TGTextMessageDto::from([
                 'methodQuery' => 'sendMessage',
                 'chat_id' => $update->chatId,
-                'message_thread_id' => $update->messageThreadId,
                 'text' => __('messages.start'),
                 'parse_mode' => 'html',
+                'reply_markup' => [
+                    'keyboard' => [
+                        [
+                            [
+                                'text' => __('messages.but_request_phone'),
+                                'request_contact' => true,
+                            ],
+                        ],
+                    ],
+                    'resize_keyboard' => true,
+                    'one_time_keyboard' => true,
+                ],
             ]);
 
             $botUser = BotUser::getOrCreateByTelegramUpdate($update);
