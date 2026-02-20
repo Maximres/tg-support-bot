@@ -197,12 +197,15 @@ class TelegramBotController
         }
         
         if ($this->dataHook->editedTopicStatus && $this->dataHook->typeSource === 'supergroup') {
-            // Сохраняем кастомное название топика при ручном редактировании
+            // Сохраняем кастомное название топика при ручном редактировании пользователем
+            // НЕ сохраняем, если это сообщение от бота (бот сам обновил название через RestoreTopicName или RenameTopic)
             if ($this->botUser && 
+                !$this->dataHook->isBot &&
                 !empty($this->dataHook->rawData['message']['forum_topic_edited']) &&
                 !empty($this->dataHook->rawData['message']['forum_topic_edited']['name'])) {
                 try {
                     $newTopicName = $this->dataHook->rawData['message']['forum_topic_edited']['name'];
+                    // Сохраняем как кастомное, так как это ручное редактирование пользователем
                     $this->botUser->setCustomTopicName($newTopicName);
                 } catch (\Throwable $e) {
                     // Логируем ошибку, но продолжаем выполнение
