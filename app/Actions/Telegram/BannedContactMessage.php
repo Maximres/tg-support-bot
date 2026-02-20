@@ -2,7 +2,6 @@
 
 namespace App\Actions\Telegram;
 
-use App\Jobs\SendTelegramSimpleQueryJob;
 use App\Models\BotUser;
 
 class BannedContactMessage
@@ -21,19 +20,8 @@ class BannedContactMessage
         ]);
         $botUser->save();
 
-        $queryParams = (new SendContactMessage())->getQueryParams($botUser);
-
-        if ($botUser->isBanned()) {
-            $queryParams->text = "<b>🚫 ПОЛЬЗОВАТЕЛЬ ЗАБЛОКИРОВАН 🚫</b> \n\n" . $queryParams->text;
-        }
-
-        if ($messageId !== null) {
-            $queryParams->message_id = $messageId;
-            $queryParams->methodQuery = 'editMessageText';
-        } else {
-            $queryParams->methodQuery = 'sendMessage';
-        }
-
-        SendTelegramSimpleQueryJob::dispatch($queryParams);
+        // Используем UpdateContactMessage для обновления контактного сообщения
+        // Это автоматически обновит сообщение с учетом статуса блокировки
+        (new UpdateContactMessage())->execute($botUser);
     }
 }

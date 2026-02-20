@@ -35,7 +35,7 @@ class SendContactMessage
             'methodQuery' => 'sendMessage',
             'chat_id' => config('traffic_source.settings.telegram.group_id'),
             'message_thread_id' => $botUser->topic_id,
-            'text' => $this->createContactMessage($botUser->chat_id, $botUser->platform, $botUser->phone_number, $botUser->full_name, $botUser->email),
+            'text' => $this->createContactMessage($botUser->chat_id, $botUser->platform, $botUser->phone_number, $botUser->full_name, $botUser->email, $botUser->isBanned()),
             'parse_mode' => 'html',
             'reply_markup' => [
                 'inline_keyboard' => $this->getKeyboard($botUser),
@@ -54,10 +54,17 @@ class SendContactMessage
      *
      * @return string
      */
-    public function createContactMessage(int $chatId, string $platform, ?string $phoneNumber = null, ?string $fullName = null, ?string $email = null): string
+    public function createContactMessage(int $chatId, string $platform, ?string $phoneNumber = null, ?string $fullName = null, ?string $email = null, bool $isBanned = false): string
     {
         try {
-            $textMessage = "<b>КОНТАКТНАЯ ИНФОРМАЦИЯ</b> \n";
+            $textMessage = '';
+            
+            // Добавляем статус блокировки, если пользователь заблокирован
+            if ($isBanned) {
+                $textMessage .= "<b>🚫 ПОЛЬЗОВАТЕЛЬ ЗАБЛОКИРОВАН 🚫</b> \n\n";
+            }
+            
+            $textMessage .= "<b>КОНТАКТНАЯ ИНФОРМАЦИЯ</b> \n";
             $textMessage .= "Источник: {$platform} \n";
             $textMessage .= "ID: {$chatId} \n";
 

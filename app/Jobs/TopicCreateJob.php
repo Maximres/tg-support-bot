@@ -92,7 +92,8 @@ class TopicCreateJob implements ShouldQueue
                     }
                 }
 
-                (new SendContactMessage())->execute($this->botUser);
+                // Отправляем контактное сообщение через UpdateContactMessage для сохранения message_id
+                (new \App\Actions\Telegram\UpdateContactMessage())->execute($this->botUser);
                 return;
             }
 

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Telegram;
 
+use App\Actions\Telegram\UpdateContactMessage;
 use App\Actions\Telegram\UpdateTopicName;
 use App\DTOs\TelegramUpdateDto;
 use App\DTOs\TGTextMessageDto;
@@ -197,6 +198,12 @@ class HandleRegistrationFlow
             return true;
         }
 
+        // Обновляем название топика и контактное сообщение, если топик уже создан
+        if (!empty($botUser->topic_id)) {
+            $this->updateTopicName($botUser);
+            $this->updateContactMessage($botUser);
+        }
+
         // Переход к следующему шагу
         $this->registrationService->setState($update->chatId, UserRegistrationService::STATE_WAITING_PHONE);
         $this->sendNextStepMessage($update, $botUser, 'phone');
@@ -240,8 +247,11 @@ class HandleRegistrationFlow
             return true;
         }
 
-        // Обновляем название топика
-        $this->updateTopicName($botUser);
+        // Обновляем название топика и контактное сообщение
+        if (!empty($botUser->topic_id)) {
+            $this->updateTopicName($botUser);
+            $this->updateContactMessage($botUser);
+        }
 
         // Если это регистрация, переходим к следующему шагу
         if ($state === UserRegistrationService::STATE_WAITING_PHONE) {
@@ -282,8 +292,11 @@ class HandleRegistrationFlow
             return true;
         }
 
-        // Обновляем название топика при сохранении телефона
-        $this->updateTopicName($botUser);
+        // Обновляем название топика и контактное сообщение при сохранении телефона
+        if (!empty($botUser->topic_id)) {
+            $this->updateTopicName($botUser);
+            $this->updateContactMessage($botUser);
+        }
 
         // Переход к следующему шагу
         $this->registrationService->setState($update->chatId, UserRegistrationService::STATE_WAITING_EMAIL);
@@ -326,8 +339,9 @@ class HandleRegistrationFlow
         if (empty($botUser->topic_id)) {
             $this->createTopicAfterRegistration($botUser);
         } else {
-            // Обновляем название топика при сохранении email
+            // Обновляем название топика и контактное сообщение при сохранении email
             $this->updateTopicName($botUser);
+            $this->updateContactMessage($botUser);
         }
 
         // Завершение регистрации
@@ -366,6 +380,9 @@ class HandleRegistrationFlow
         // Обновляем название топика
         $this->updateTopicName($botUser);
 
+        // Обновляем контактное сообщение в топике
+        $this->updateContactMessage($botUser);
+
         // Завершение редактирования
         $this->registrationService->clearState($update->chatId);
         $this->sendEditSuccessMessage($update, $botUser, __('messages.registration.edit.full_name_saved'));
@@ -402,6 +419,9 @@ class HandleRegistrationFlow
         // Обновляем название топика
         $this->updateTopicName($botUser);
 
+        // Обновляем контактное сообщение в топике
+        $this->updateContactMessage($botUser);
+
         // Завершение редактирования
         $this->registrationService->clearState($update->chatId);
         $this->sendEditSuccessMessage($update, $botUser, __('messages.registration.edit.phone_saved'));
@@ -434,6 +454,12 @@ class HandleRegistrationFlow
             $this->sendErrorMessage($update, $botUser, __('messages.registration.error.save_failed'));
             return true;
         }
+
+        // Обновляем название топика
+        $this->updateTopicName($botUser);
+
+        // Обновляем контактное сообщение в топике
+        $this->updateContactMessage($botUser);
 
         // Завершение редактирования
         $this->registrationService->clearState($update->chatId);
@@ -675,6 +701,30 @@ class HandleRegistrationFlow
         } catch (\Throwable $e) {
             // Edge case: ошибка обновления названия не должна прерывать регистрацию
             Log::warning('HandleRegistrationFlow: ошибка обновления названия топика', [
+                'bot_user_id' => $botUser->id ?? null,
+                'topic_id' => $botUser->topic_id ?? null,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Обновить контактное сообщение в топике
+     * Edge case: топик не создан, ошибка обновления
+     *
+     * @param BotUser $botUser
+     *
+     * @return void
+     */
+    private function updateContactMessage(BotUser $botUser): void
+    {
+        try {
+            if (!empty($botUser->topic_id)) {
+                (new UpdateContactMessage())->execute($botUser);
+            }
+        } catch (\Throwable $e) {
+            // Edge case: ошибка обновления контактного сообщения не должна прерывать регистрацию
+            Log::warning('HandleRegistrationFlow: ошибка обновления контактного сообщения', [
                 'bot_user_id' => $botUser->id ?? null,
                 'topic_id' => $botUser->topic_id ?? null,
                 'error' => $e->getMessage(),

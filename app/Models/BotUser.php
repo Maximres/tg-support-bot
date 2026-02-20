@@ -18,6 +18,7 @@ use phpDocumentor\Reflection\Exception;
  * @property int               $id
  * @property int|null          $sequential_number
  * @property int               $topic_id
+ * @property int|null          $contact_info_message_id
  * @property int               $chat_id
  * @property string            $platform
  * @property string|null       $phone_number
@@ -40,6 +41,7 @@ class BotUser extends Model
     protected $fillable = [
         'chat_id',
         'topic_id',
+        'contact_info_message_id',
         'platform',
         'phone_number',
         'full_name',

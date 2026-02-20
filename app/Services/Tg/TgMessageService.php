@@ -4,6 +4,7 @@ namespace App\Services\Tg;
 
 use App\Actions\Telegram\ConversionMessageText;
 use App\Actions\Telegram\HandleRegistrationFlow;
+use App\Actions\Telegram\UpdateContactMessage;
 use App\Actions\Telegram\UpdateTopicName;
 use App\DTOs\TelegramUpdateDto;
 use App\Jobs\SendMessage\SendTelegramMessageJob;
@@ -210,6 +211,9 @@ class TgMessageService extends FromTgMessageService
                 ]);
                 
                 (new UpdateTopicName())->execute($this->botUser);
+                
+                // Обновляем контактное сообщение в топике
+                (new UpdateContactMessage())->execute($this->botUser);
             } catch (\Throwable $e) {
                 // Edge case: ошибки при обновлении топика не должны ломать обработку контакта
                 Log::warning('TgMessageService::sendContact: ошибка при обновлении названия топика', [
