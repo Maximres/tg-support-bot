@@ -55,10 +55,8 @@ class RenameTopic
             // Извлекаем новое название из текста команды
             $newName = $this->extractNewName($update->text);
             if (empty($newName)) {
-                Log::warning('RenameTopic: новое название пустое', [
-                    'bot_user_id' => $botUser->id ?? null,
-                    'text' => $update->text,
-                ]);
+                // Если название не указано, отправляем сообщение с запросом названия
+                $this->sendRenameRequestMessage($botUser, $update);
                 return;
             }
 
@@ -127,14 +125,60 @@ class RenameTopic
             return '';
         }
 
-        // Удаляем команду /rename_topic и пробелы в начале
-        // Поддерживаем как "/rename_topic название", так и "/rename_topicназвание" (без пробела)
-        $newName = preg_replace('/^\/rename_topic\s*/i', '', $text);
+        // Удаляем команду /rename_topic и опционально @bot_username
+        // Поддерживаем форматы:
+        // - "/rename_topic название"
+        // - "/rename_topicназвание" (без пробела)
+        // - "/rename_topic@GarSuppTopicsBot название"
+        // - "/rename_topic@GarSuppTopicsBotназвание" (без пробела)
+        $newName = preg_replace('/^\/rename_topic(?:@\w+)?\s*/i', '', $text);
         
         // Убираем лишние пробелы
         $newName = trim($newName);
 
         return $newName;
+    }
+
+    /**
+     * Отправить сообщение с запросом названия для переименования топика
+     *
+     * @param BotUser $botUser
+     * @param TelegramUpdateDto $update
+     *
+     * @return void
+     */
+    private function sendRenameRequestMessage(BotUser $botUser, TelegramUpdateDto $update): void
+    {
+        try {
+            $groupId = config('traffic_source.settings.telegram.group_id');
+            
+            // Удаляем сообщение с командой
+            SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from([
+                'methodQuery' => 'deleteMessage',
+                'chat_id' => $groupId,
+                'message_id' => $update->messageId,
+            ]));
+            
+            // Отправляем сообщение с запросом названия
+            SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from([
+                'methodQuery' => 'sendMessage',
+                'chat_id' => $groupId,
+                'message_thread_id' => $botUser->topic_id,
+                'text' => __('messages.command_rename_topic_request'),
+                'parse_mode' => 'html',
+            ]));
+
+            Log::info('RenameTopic: отправлен запрос на ввод названия', [
+                'bot_user_id' => $botUser->id,
+                'topic_id' => $botUser->topic_id,
+            ]);
+        } catch (\Throwable $e) {
+            (new LokiLogger())->logException($e);
+            Log::error('RenameTopic: ошибка при отправке запроса названия', [
+                'error' => $e->getMessage(),
+                'bot_user_id' => $botUser->id ?? null,
+            ]);
+        }
     }
 }
 
