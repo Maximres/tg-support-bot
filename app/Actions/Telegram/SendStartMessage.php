@@ -80,7 +80,7 @@ class SendStartMessage
             $messageParams = [
                 'methodQuery' => 'sendMessage',
                 'chat_id' => $update->chatId,
-                'text' => __('registration.welcome'),
+                'text' => __('messages.registration.welcome'),
                 'parse_mode' => 'html',
             ];
 
@@ -140,10 +140,10 @@ class SendStartMessage
     private function sendFirstFieldRequest(TelegramUpdateDto $update, BotUser $botUser, string $state): void
     {
         $messageKey = match ($state) {
-            UserRegistrationService::STATE_WAITING_FULL_NAME => 'registration.ask_full_name',
-            UserRegistrationService::STATE_WAITING_PHONE => 'registration.ask_phone',
-            UserRegistrationService::STATE_WAITING_EMAIL => 'registration.ask_email',
-            default => 'registration.ask_full_name',
+            UserRegistrationService::STATE_WAITING_FULL_NAME => 'messages.registration.ask_full_name',
+            UserRegistrationService::STATE_WAITING_PHONE => 'messages.registration.ask_phone',
+            UserRegistrationService::STATE_WAITING_EMAIL => 'messages.registration.ask_email',
+            default => 'messages.registration.ask_full_name',
         };
 
         $messageParams = [

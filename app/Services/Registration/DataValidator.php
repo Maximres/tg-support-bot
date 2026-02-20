@@ -33,7 +33,7 @@ class DataValidator
         if (empty($fullName)) {
             return [
                 'valid' => false,
-                'error' => __('registration.validation.full_name_required'),
+                'error' => __('messages.registration.validation.full_name_required'),
                 'normalized' => null,
             ];
         }
@@ -44,7 +44,7 @@ class DataValidator
         if (empty($normalized)) {
             return [
                 'valid' => false,
-                'error' => __('registration.validation.full_name_required'),
+                'error' => __('messages.registration.validation.full_name_required'),
                 'normalized' => null,
             ];
         }
@@ -53,7 +53,7 @@ class DataValidator
         if (mb_strlen($normalized) < self::MIN_FULL_NAME_LENGTH) {
             return [
                 'valid' => false,
-                'error' => __('registration.validation.full_name_too_short', [
+                'error' => __('messages.registration.validation.full_name_too_short', [
                     'min' => self::MIN_FULL_NAME_LENGTH,
                 ]),
                 'normalized' => null,
@@ -71,7 +71,7 @@ class DataValidator
             
             return [
                 'valid' => true,
-                'error' => __('registration.validation.full_name_truncated'),
+                'error' => __('messages.registration.validation.full_name_truncated'),
                 'normalized' => $normalized,
             ];
         }
@@ -98,7 +98,7 @@ class DataValidator
         if (empty($phone)) {
             return [
                 'valid' => false,
-                'error' => __('registration.validation.phone_required'),
+                'error' => __('messages.registration.validation.phone_required'),
                 'normalized' => null,
             ];
         }
@@ -110,7 +110,7 @@ class DataValidator
         if (empty($normalized)) {
             return [
                 'valid' => false,
-                'error' => __('registration.validation.phone_invalid'),
+                'error' => __('messages.registration.validation.phone_invalid'),
                 'normalized' => null,
             ];
         }
@@ -128,7 +128,7 @@ class DataValidator
         if (!preg_match('/^\+/', $normalized)) {
             return [
                 'valid' => false,
-                'error' => __('registration.validation.phone_invalid'),
+                'error' => __('messages.registration.validation.phone_invalid'),
                 'normalized' => null,
             ];
         }
@@ -137,7 +137,7 @@ class DataValidator
         if (strlen($digitsOnly) < 10 || strlen($digitsOnly) > 15) {
             return [
                 'valid' => false,
-                'error' => __('registration.validation.phone_invalid'),
+                'error' => __('messages.registration.validation.phone_invalid'),
                 'normalized' => null,
             ];
         }
@@ -163,7 +163,7 @@ class DataValidator
         if (empty($email)) {
             return [
                 'valid' => false,
-                'error' => __('registration.validation.email_required'),
+                'error' => __('messages.registration.validation.email_required'),
                 'normalized' => null,
             ];
         }
@@ -174,7 +174,7 @@ class DataValidator
         if (empty($normalized)) {
             return [
                 'valid' => false,
-                'error' => __('registration.validation.email_required'),
+                'error' => __('messages.registration.validation.email_required'),
                 'normalized' => null,
             ];
         }
@@ -183,7 +183,7 @@ class DataValidator
         if (!filter_var($normalized, FILTER_VALIDATE_EMAIL)) {
             return [
                 'valid' => false,
-                'error' => __('registration.validation.email_invalid'),
+                'error' => __('messages.registration.validation.email_invalid'),
                 'normalized' => null,
             ];
         }

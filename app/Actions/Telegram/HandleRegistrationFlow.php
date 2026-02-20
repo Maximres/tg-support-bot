@@ -192,7 +192,7 @@ class HandleRegistrationFlow
         ]);
 
         if (!$saved) {
-            $this->sendErrorMessage($update, $botUser, __('registration.error.save_failed'));
+            $this->sendErrorMessage($update, $botUser, __('messages.registration.error.save_failed'));
             return true;
         }
 
@@ -218,7 +218,7 @@ class HandleRegistrationFlow
         $phoneNumber = $contactData['phone_number'] ?? null;
 
         if (empty($phoneNumber)) {
-            $this->sendValidationError($update, $botUser, __('registration.validation.phone_required'));
+            $this->sendValidationError($update, $botUser, __('messages.registration.validation.phone_required'));
             return true;
         }
 
@@ -235,7 +235,7 @@ class HandleRegistrationFlow
         ]);
 
         if (!$saved) {
-            $this->sendErrorMessage($update, $botUser, __('registration.error.save_failed'));
+            $this->sendErrorMessage($update, $botUser, __('messages.registration.error.save_failed'));
             return true;
         }
 
@@ -249,7 +249,7 @@ class HandleRegistrationFlow
         } else {
             // Если это редактирование, завершаем
             $this->registrationService->clearState($update->chatId);
-            $this->sendEditSuccessMessage($update, $botUser, __('registration.edit.phone_saved'));
+            $this->sendEditSuccessMessage($update, $botUser, __('messages.registration.edit.phone_saved'));
         }
 
         return true;
@@ -277,7 +277,7 @@ class HandleRegistrationFlow
         ]);
 
         if (!$saved) {
-            $this->sendErrorMessage($update, $botUser, __('registration.error.save_failed'));
+            $this->sendErrorMessage($update, $botUser, __('messages.registration.error.save_failed'));
             return true;
         }
 
@@ -314,7 +314,7 @@ class HandleRegistrationFlow
         ]);
 
         if (!$saved) {
-            $this->sendErrorMessage($update, $botUser, __('registration.error.save_failed'));
+            $this->sendErrorMessage($update, $botUser, __('messages.registration.error.save_failed'));
             return true;
         }
 
@@ -350,7 +350,7 @@ class HandleRegistrationFlow
         ]);
 
         if (!$saved) {
-            $this->sendErrorMessage($update, $botUser, __('registration.error.save_failed'));
+            $this->sendErrorMessage($update, $botUser, __('messages.registration.error.save_failed'));
             return true;
         }
 
@@ -359,7 +359,7 @@ class HandleRegistrationFlow
 
         // Завершение редактирования
         $this->registrationService->clearState($update->chatId);
-        $this->sendEditSuccessMessage($update, $botUser, __('registration.edit.full_name_saved'));
+        $this->sendEditSuccessMessage($update, $botUser, __('messages.registration.edit.full_name_saved'));
 
         return true;
     }
@@ -386,7 +386,7 @@ class HandleRegistrationFlow
         ]);
 
         if (!$saved) {
-            $this->sendErrorMessage($update, $botUser, __('registration.error.save_failed'));
+            $this->sendErrorMessage($update, $botUser, __('messages.registration.error.save_failed'));
             return true;
         }
 
@@ -395,7 +395,7 @@ class HandleRegistrationFlow
 
         // Завершение редактирования
         $this->registrationService->clearState($update->chatId);
-        $this->sendEditSuccessMessage($update, $botUser, __('registration.edit.phone_saved'));
+        $this->sendEditSuccessMessage($update, $botUser, __('messages.registration.edit.phone_saved'));
 
         return true;
     }
@@ -422,13 +422,13 @@ class HandleRegistrationFlow
         ]);
 
         if (!$saved) {
-            $this->sendErrorMessage($update, $botUser, __('registration.error.save_failed'));
+            $this->sendErrorMessage($update, $botUser, __('messages.registration.error.save_failed'));
             return true;
         }
 
         // Завершение редактирования
         $this->registrationService->clearState($update->chatId);
-        $this->sendEditSuccessMessage($update, $botUser, __('registration.edit.email_saved'));
+        $this->sendEditSuccessMessage($update, $botUser, __('messages.registration.edit.email_saved'));
 
         return true;
     }
@@ -552,7 +552,7 @@ class HandleRegistrationFlow
      */
     private function sendNextStepMessage(TelegramUpdateDto $update, BotUser $botUser, string $step): void
     {
-        $messageKey = $step === 'phone' ? 'registration.ask_phone' : 'registration.ask_email';
+            $messageKey = $step === 'phone' ? 'messages.registration.ask_phone' : 'messages.registration.ask_email';
         
         $messageParamsDTO = TGTextMessageDto::from([
             'methodQuery' => 'sendMessage',
@@ -582,7 +582,7 @@ class HandleRegistrationFlow
         $messageParamsDTO = TGTextMessageDto::from([
             'methodQuery' => 'sendMessage',
             'chat_id' => $update->chatId,
-            'text' => __('registration.completed'),
+            'text' => __('messages.registration.completed'),
             'parse_mode' => 'html',
         ]);
 

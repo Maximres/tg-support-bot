@@ -43,35 +43,35 @@ class ShowUserDataMenu
 
         try {
             // Формируем текст с данными пользователя
-            $text = __('registration.my_data.header') . "\n\n";
+            $text = __('messages.registration.my_data.header') . "\n\n";
             
-            $fullName = $botUser->full_name ?? __('registration.my_data.not_provided');
-            $phone = $botUser->phone_number ?? __('registration.my_data.not_provided');
-            $email = $botUser->email ?? __('registration.my_data.not_provided');
+            $fullName = $botUser->full_name ?? __('messages.registration.my_data.not_provided');
+            $phone = $botUser->phone_number ?? __('messages.registration.my_data.not_provided');
+            $email = $botUser->email ?? __('messages.registration.my_data.not_provided');
             
-            $text .= __('registration.my_data.full_name') . ": <b>{$fullName}</b>\n";
-            $text .= __('registration.my_data.phone') . ": <b>{$phone}</b>\n";
-            $text .= __('registration.my_data.email') . ": <b>{$email}</b>\n\n";
+            $text .= __('messages.registration.my_data.full_name') . ": <b>{$fullName}</b>\n";
+            $text .= __('messages.registration.my_data.phone') . ": <b>{$phone}</b>\n";
+            $text .= __('messages.registration.my_data.email') . ": <b>{$email}</b>\n\n";
             
-            $text .= __('registration.edit_menu.instructions');
+            $text .= __('messages.registration.edit_menu.instructions');
 
             // Формируем клавиатуру для редактирования
             $keyboard = [
                 [
                     [
-                        'text' => __('registration.edit_menu.edit_full_name'),
+                        'text' => __('messages.registration.edit_menu.edit_full_name'),
                         'callback_data' => 'edit_full_name',
                     ],
                 ],
                 [
                     [
-                        'text' => __('registration.edit_menu.edit_phone'),
+                        'text' => __('messages.registration.edit_menu.edit_phone'),
                         'callback_data' => 'edit_phone',
                     ],
                 ],
                 [
                     [
-                        'text' => __('registration.edit_menu.edit_email'),
+                        'text' => __('messages.registration.edit_menu.edit_email'),
                         'callback_data' => 'edit_email',
                     ],
                 ],
@@ -81,7 +81,7 @@ class ShowUserDataMenu
             if ($this->registrationService->isEditing($update->chatId)) {
                 $keyboard[] = [
                     [
-                        'text' => __('registration.edit_menu.cancel'),
+                        'text' => __('messages.registration.edit_menu.cancel'),
                         'callback_data' => 'cancel_edit',
                     ],
                 ];

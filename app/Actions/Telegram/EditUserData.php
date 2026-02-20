@@ -67,9 +67,9 @@ class EditUserData
 
             // Определяем сообщение для запроса нового значения
             $messageKey = match ($field) {
-                'full_name' => 'registration.edit.ask_full_name',
-                'phone' => 'registration.edit.ask_phone',
-                'email' => 'registration.edit.ask_email',
+                'full_name' => 'messages.registration.edit.ask_full_name',
+                'phone' => 'messages.registration.edit.ask_phone',
+                'email' => 'messages.registration.edit.ask_email',
                 default => null,
             };
 
@@ -90,18 +90,18 @@ class EditUserData
             // Если есть текущее значение, показываем его
             if (!empty($currentValue)) {
                 $currentLabel = match ($field) {
-                    'full_name' => __('registration.my_data.full_name'),
-                    'phone' => __('registration.my_data.phone'),
-                    'email' => __('registration.my_data.email'),
+                    'full_name' => __('messages.registration.my_data.full_name'),
+                    'phone' => __('messages.registration.my_data.phone'),
+                    'email' => __('messages.registration.my_data.email'),
                     default => '',
                 };
-                $text .= "\n\n" . __('registration.edit.current_value', [
+                $text .= "\n\n" . __('messages.registration.edit.current_value', [
                     'field' => $currentLabel,
                     'value' => $currentValue,
                 ]);
             }
 
-            $text .= "\n\n" . __('registration.edit.cancel_hint');
+            $text .= "\n\n" . __('messages.registration.edit.cancel_hint');
 
             $messageParams = [
                 'methodQuery' => 'sendMessage',
@@ -150,7 +150,7 @@ class EditUserData
             $messageParams = [
                 'methodQuery' => 'sendMessage',
                 'chat_id' => $update->chatId,
-                'text' => __('registration.edit.cancelled'),
+                'text' => __('messages.registration.edit.cancelled'),
                 'parse_mode' => 'html',
             ];
 
