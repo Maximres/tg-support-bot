@@ -85,6 +85,39 @@ class TelegramBotController
     }
 
     /**
+     * Проверить, соответствует ли текст команде (с учетом формата /command@bot_username)
+     *
+     * @param string $command Команда для проверки (например, '/contact')
+     * @param string|null $text Текст сообщения
+     *
+     * @return bool
+     */
+    protected function isCommand(string $command, ?string $text): bool
+    {
+        if (empty($text)) {
+            return false;
+        }
+
+        // Проверяем точное совпадение
+        if ($text === $command) {
+            return true;
+        }
+
+        // Проверяем формат /command@bot_username (любой бот) - точное совпадение
+        if (preg_match('/^' . preg_quote($command, '/') . '@\w+$/', $text)) {
+            return true;
+        }
+
+        // Проверяем начало строки для команд с параметрами
+        // Формат: /command параметры или /command@bot параметры
+        if (preg_match('/^' . preg_quote($command, '/') . '(?:@\w+)?(?:\s|$)/', $text)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Check message
      *
      * @return void
@@ -188,10 +221,10 @@ class TelegramBotController
             ]));
         } elseif (!$this->dataHook->isBot) {
             if ($this->dataHook->typeSource === 'supergroup') {
-                if ($this->dataHook->text === '/contact' && $this->isSupergroup()) {
+                if ($this->isCommand('/contact', $this->dataHook->text) && $this->isSupergroup()) {
                     (new SendContactMessage())->execute($this->botUser);
                     die();
-                } elseif (($this->dataHook->text === '/request_phone' || $this->dataHook->text === '/get_phone') && $this->isSupergroup() && $this->botUser) {
+                } elseif (($this->isCommand('/request_phone', $this->dataHook->text) || $this->isCommand('/get_phone', $this->dataHook->text)) && $this->isSupergroup() && $this->botUser) {
                     (new RequestPhoneFromGroup())->execute($this->botUser);
                     die();
                 }
@@ -243,15 +276,15 @@ class TelegramBotController
         } else {
             switch ($this->dataHook->typeQuery) {
                 case 'message':
-                    if ($this->dataHook->text === '/start' && !$this->isSupergroup()) {
+                    if ($this->isCommand('/start', $this->dataHook->text) && !$this->isSupergroup()) {
                         (new SendStartMessage())->execute($this->dataHook);
-                    } elseif (($this->dataHook->text === '/phone' || $this->dataHook->text === '/share_phone') && !$this->isSupergroup()) {
+                    } elseif (($this->isCommand('/phone', $this->dataHook->text) || $this->isCommand('/share_phone', $this->dataHook->text)) && !$this->isSupergroup()) {
                         (new SendPhoneRequestMessage())->execute($this->dataHook);
-                    } elseif (str_contains($this->dataHook->text, '/ai_generate') && $this->isSupergroup()) {
+                    } elseif ($this->dataHook->text && str_contains($this->dataHook->text, '/ai_generate') && $this->isSupergroup()) {
                         (new SendAiAnswerMessage())->execute($this->dataHook);
-                    } elseif (str_starts_with($this->dataHook->text, '/rename_topic') && $this->isSupergroup()) {
+                    } elseif ($this->isCommand('/rename_topic', $this->dataHook->text) && $this->isSupergroup()) {
                         (new RenameTopic())->execute($this->dataHook);
-                    } elseif (str_starts_with(trim($this->dataHook->text ?? ''), '/restore_topic_name') && $this->isSupergroup()) {
+                    } elseif ($this->isCommand('/restore_topic_name', $this->dataHook->text) && $this->isSupergroup()) {
                         (new RestoreTopicName())->execute($this->dataHook);
                     } else {
                         (new TgMessageService($this->dataHook))->handleUpdate();
