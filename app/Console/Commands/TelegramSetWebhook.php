@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Actions\Telegram\SetBotCommands;
 use App\TelegramBot\TelegramMethods;
 use Illuminate\Console\Command;
 
@@ -34,6 +35,20 @@ class TelegramSetWebhook extends Command
             $this->line(json_encode($result->rawData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         } else {
             $this->error('Ошибка при установке webhook');
+            return Command::FAILURE;
+        }
+
+        // Автоматически устанавливаем команды бота после установки webhook
+        $this->newLine();
+        $this->info('Установка команд бота...');
+        
+        $setBotCommands = new SetBotCommands();
+        $results = $setBotCommands->setAllCommands();
+
+        if ($results['private'] && $results['group']) {
+            $this->info('✅ Команды бота установлены успешно');
+        } else {
+            $this->warn('⚠️ Произошли ошибки при установке команд бота');
         }
 
         return Command::SUCCESS;
