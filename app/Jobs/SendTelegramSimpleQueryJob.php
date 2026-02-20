@@ -43,8 +43,32 @@ class SendTelegramSimpleQueryJob implements ShouldQueue
             );
 
             if (!$response->ok) {
-                // Для editForumTopic логируем более детальную информацию
+                // Для editForumTopic обрабатываем специальные случаи
                 if ($methodQuery === 'editForumTopic') {
+                    // TOPIC_NOT_MODIFIED - это не ошибка, топик просто не изменился
+                    // (например, иконка уже null или та же самая)
+                    $errorDescription = $response->description ?? '';
+                    if (str_contains($errorDescription, 'TOPIC_NOT_MODIFIED')) {
+                        \Illuminate\Support\Facades\Log::debug('Топик не был изменен (TOPIC_NOT_MODIFIED)', [
+                            'method' => $methodQuery,
+                            'topic_id' => $params['message_thread_id'] ?? null,
+                            'icon' => $params['icon_custom_emoji_id'] ?? null,
+                            'name' => $params['name'] ?? null,
+                        ]);
+                        
+                        // Освобождаем блокировку, если она была установлена
+                        $topicId = $params['message_thread_id'] ?? null;
+                        if ($topicId) {
+                            $lockKey = 'topic_icon_update_' . $topicId;
+                            \Illuminate\Support\Facades\Cache::forget($lockKey);
+                            \Illuminate\Support\Facades\Cache::forget($lockKey . '_released');
+                        }
+                        
+                        // Возвращаем успех, так как это не ошибка
+                        return true;
+                    }
+                    
+                    // Для других ошибок логируем предупреждение
                     \Illuminate\Support\Facades\Log::warning('Ошибка обновления иконки топика', [
                         'method' => $methodQuery,
                         'topic_id' => $params['message_thread_id'] ?? null,
