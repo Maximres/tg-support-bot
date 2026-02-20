@@ -27,6 +27,16 @@ class TgMessageService extends FromTgMessageService
                 throw new \Exception("Неизвестный тип события: {$this->update->typeQuery}", 1);
             }
 
+            // Логируем тип сообщения для отладки
+            Log::info('TgMessageService::handleUpdate: обработка сообщения', [
+                'bot_user_id' => $this->botUser->id ?? null,
+                'chat_id' => $this->update->chatId ?? null,
+                'type_source' => $this->update->typeSource ?? null,
+                'has_contact' => !empty($this->update->rawData['message']['contact']),
+                'has_text' => !empty($this->update->text),
+                'has_photo' => !empty($this->update->rawData['message']['photo']),
+            ]);
+
             if (!empty($this->update->rawData['message']['photo'])) {
                 $this->sendPhoto();
             } elseif (!empty($this->update->rawData['message']['document'])) {
@@ -128,24 +138,51 @@ class TgMessageService extends FromTgMessageService
      */
     protected function sendContact(): void
     {
+        Log::info('TgMessageService::sendContact: начало обработки контакта', [
+            'bot_user_id' => $this->botUser->id ?? null,
+            'chat_id' => $this->update->chatId ?? null,
+            'type_source' => $this->update->typeSource ?? null,
+            'has_contact' => !empty($this->update->rawData['message']['contact']),
+        ]);
+        
         $this->messageParamsDTO->methodQuery = 'sendMessage';
-        $contactData = $this->update->rawData['message']['contact'];
+        $contactData = $this->update->rawData['message']['contact'] ?? [];
+
+        Log::info('TgMessageService::sendContact: данные контакта', [
+            'bot_user_id' => $this->botUser->id ?? null,
+            'contact_data' => $contactData,
+            'phone_number' => $contactData['phone_number'] ?? null,
+        ]);
 
         // Сохраняем номер телефона в BotUser
         if (!empty($contactData['phone_number']) && $this->botUser) {
+            $oldPhoneNumber = $this->botUser->phone_number;
             $this->botUser->phone_number = $contactData['phone_number'];
             $this->botUser->save();
 
-            // Обновляем название топика, если номер был сохранен
+            // Обновляем название топика, если номер был сохранен или изменен
             try {
                 // Обновляем модель из БД для получения актуальных данных
                 $this->botUser->refresh();
+                
+                // Логируем информацию для отладки
+                Log::info('TgMessageService::sendContact: номер телефона сохранен, обновляем название топика', [
+                    'bot_user_id' => $this->botUser->id ?? null,
+                    'topic_id' => $this->botUser->topic_id ?? null,
+                    'phone_number' => $this->botUser->phone_number,
+                    'old_phone_number' => $oldPhoneNumber,
+                    'has_custom_topic_name' => $this->botUser->hasCustomTopicName(),
+                    'custom_topic_name' => $this->botUser->getCustomTopicName(),
+                ]);
+                
                 (new UpdateTopicName())->execute($this->botUser);
             } catch (\Throwable $e) {
                 // Edge case: ошибки при обновлении топика не должны ломать обработку контакта
                 Log::warning('TgMessageService::sendContact: ошибка при обновлении названия топика', [
                     'bot_user_id' => $this->botUser->id ?? null,
+                    'topic_id' => $this->botUser->topic_id ?? null,
                     'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
                 ]);
             }
         }

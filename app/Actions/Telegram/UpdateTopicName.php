@@ -28,17 +28,86 @@ class UpdateTopicName
         try {
             // Edge case: проверяем наличие topic_id
             if (empty($botUser->topic_id)) {
-                Log::debug('UpdateTopicName: topic_id пустой, топик еще не создан', [
+                Log::info('UpdateTopicName: topic_id пустой, топик еще не создан', [
                     'bot_user_id' => $botUser->id ?? null,
+                    'chat_id' => $botUser->chat_id ?? null,
                 ]);
                 return;
             }
 
-            // Edge case: не обновляем, если название изменено вручную
+            // Edge case: если название изменено вручную, проверяем нужно ли добавить номер
             if ($botUser->hasCustomTopicName()) {
-                Log::debug('UpdateTopicName: название топика изменено вручную, пропускаем автоматическое обновление', [
+                $customTopicName = $botUser->getCustomTopicName();
+                
+                // Если номер уже есть в кастомном названии, не обновляем
+                // Проверяем наличие номера в названии (учитываем возможные форматы: с +, без +, с пробелами)
+                if (!empty($botUser->phone_number)) {
+                    $phoneInName = str_contains($customTopicName, $botUser->phone_number) ||
+                                   str_contains($customTopicName, '+' . $botUser->phone_number) ||
+                                   str_contains($customTopicName, ltrim($botUser->phone_number, '+'));
+                    
+                    if ($phoneInName) {
+                        Log::info('UpdateTopicName: название топика изменено вручную и номер уже присутствует, пропускаем обновление', [
+                            'bot_user_id' => $botUser->id ?? null,
+                            'topic_id' => $botUser->topic_id ?? null,
+                            'custom_topic_name' => $customTopicName,
+                            'phone_number' => $botUser->phone_number,
+                        ]);
+                        return;
+                    }
+                }
+                
+                // Если номер еще не добавлен к кастомному названию, добавляем его
+                if (!empty($botUser->phone_number)) {
+                    // Проверяем существование топика перед обновлением
+                    if (!CheckTopicExists::execute((int)$botUser->topic_id)) {
+                        Log::warning('UpdateTopicName: топик не существует, пропускаем добавление номера к кастомному названию', [
+                            'bot_user_id' => $botUser->id ?? null,
+                            'topic_id' => $botUser->topic_id,
+                        ]);
+                        return;
+                    }
+                    
+                    $newTopicName = $customTopicName . ' ' . $botUser->phone_number;
+                    
+                    // Проверяем длину
+                    if (mb_strlen($newTopicName) > 128) {
+                        Log::warning('UpdateTopicName: название с добавленным номером слишком длинное', [
+                            'bot_user_id' => $botUser->id ?? null,
+                            'original_length' => mb_strlen($newTopicName),
+                            'max_length' => 128,
+                        ]);
+                        // Обрезаем, но стараемся сохранить номер
+                        $maxCustomLength = 128 - mb_strlen($botUser->phone_number) - 1; // -1 для пробела
+                        $newTopicName = mb_substr($customTopicName, 0, max(0, $maxCustomLength)) . ' ' . $botUser->phone_number;
+                    }
+                    
+                    // Обновляем кастомное название с добавленным номером
+                    $botUser->setCustomTopicName($newTopicName);
+                    
+                    // Отправляем запрос на обновление названия топика через очередь
+                    $groupId = config('traffic_source.settings.telegram.group_id');
+                    SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from([
+                        'methodQuery' => 'editForumTopic',
+                        'chat_id' => $groupId,
+                        'message_thread_id' => $botUser->topic_id,
+                        'name' => $newTopicName,
+                    ]));
+                    
+                    Log::info('UpdateTopicName: номер добавлен к кастомному названию топика', [
+                        'bot_user_id' => $botUser->id,
+                        'topic_id' => $botUser->topic_id,
+                        'old_topic_name' => $customTopicName,
+                        'new_topic_name' => $newTopicName,
+                    ]);
+                    return;
+                }
+                
+                // Если номера нет, пропускаем обновление
+                Log::info('UpdateTopicName: название топика изменено вручную, номер не предоставлен, пропускаем обновление', [
                     'bot_user_id' => $botUser->id ?? null,
-                    'custom_topic_name' => $botUser->getCustomTopicName(),
+                    'topic_id' => $botUser->topic_id ?? null,
+                    'custom_topic_name' => $customTopicName,
                 ]);
                 return;
             }

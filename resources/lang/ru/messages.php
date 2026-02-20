@@ -29,6 +29,9 @@ return [
     'command_request_phone_description' => 'Запросить номер телефона у клиента',
     'command_rename_topic_description' => 'Переименовать топик (использование: /rename_topic новое название)',
     'command_restore_topic_name_description' => 'Восстановить название топика по умолчанию',
-    'command_rename_topic_request' => 'Пожалуйста, укажите новое название топика после команды:\n<code>/rename_topic новое название</code>\n\nПример: <code>/rename_topic Важное обращение</code>',
+    'command_rename_topic_request' => "Пожалуйста, укажите новое название топика после команды:
+<code>/rename_topic новое название</code>
+
+Пример: <code>/rename_topic Важное обращение</code>",
 
 ];
