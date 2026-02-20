@@ -3,11 +3,13 @@
 namespace App\Services\Tg;
 
 use App\Actions\Telegram\ConversionMessageText;
+use App\Actions\Telegram\HandleRegistrationFlow;
 use App\Actions\Telegram\UpdateTopicName;
 use App\DTOs\TelegramUpdateDto;
 use App\Jobs\SendMessage\SendTelegramMessageJob;
 use App\Logging\LokiLogger;
 use App\Services\ActionService\Send\FromTgMessageService;
+use App\Services\Registration\UserRegistrationService;
 use Illuminate\Support\Facades\Log;
 
 class TgMessageService extends FromTgMessageService
@@ -36,6 +38,38 @@ class TgMessageService extends FromTgMessageService
                 'has_text' => !empty($this->update->text),
                 'has_photo' => !empty($this->update->rawData['message']['photo']),
             ]);
+
+            // Edge case: проверка на регистрацию или редактирование
+            // Обрабатываем только в приватных чатах (текстовые сообщения и контакты)
+            if ($this->update->typeSource === 'private' && 
+                (!empty($this->update->text) || !empty($this->update->rawData['message']['contact']))) {
+                $registrationService = new UserRegistrationService();
+                
+                // Edge case: определение первого контакта - если пользователь нуждается в регистрации
+                // и нет состояния, запускаем регистрацию (кроме команды /start, которая обрабатывается отдельно)
+                if ($this->botUser->needsRegistration() && 
+                    !$registrationService->getState($this->update->chatId) &&
+                    !empty($this->update->text) &&
+                    !str_starts_with($this->update->text, '/start')) {
+                    // Запускаем регистрацию через SendStartMessage
+                    (new \App\Actions\Telegram\SendStartMessage())->execute($this->update);
+                    return;
+                }
+                
+                // Проверяем, находится ли пользователь в процессе регистрации или редактирования
+                if ($registrationService->isInRegistration($this->update->chatId) || 
+                    $registrationService->isEditing($this->update->chatId)) {
+                    
+                    // Обрабатываем через HandleRegistrationFlow
+                    $registrationHandler = new HandleRegistrationFlow();
+                    $handled = $registrationHandler->execute($this->update, $this->botUser);
+                    
+                    if ($handled) {
+                        // Сообщение обработано в контексте регистрации, не продолжаем обычную обработку
+                        return;
+                    }
+                }
+            }
 
             if (!empty($this->update->rawData['message']['photo'])) {
                 $this->sendPhoto();

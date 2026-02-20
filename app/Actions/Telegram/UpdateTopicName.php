@@ -203,22 +203,45 @@ class UpdateTopicName
                 return '#' . $displayId . ' (' . $botUser->platform . ')';
             }
 
-            // Формируем название: #ПорядковыйНомер Имя Фамилия +номер
+            // Формируем название: #ПорядковыйНомер FullName +phone email
             $topicName = '#' . $displayId;
 
-            $firstName = $nameParts['first_name'] ?? '';
-            $lastName = $nameParts['last_name'] ?? '';
+            // Используем full_name из БД, если доступен, иначе fallback на данные из Telegram
+            if (!empty($botUser->full_name)) {
+                $topicName .= ' ' . $botUser->full_name;
+            } else {
+                // Fallback на данные из Telegram API
+                $firstName = $nameParts['first_name'] ?? '';
+                $lastName = $nameParts['last_name'] ?? '';
 
-            if (!empty($firstName) || !empty($lastName)) {
-                $fullName = trim($firstName . ' ' . $lastName);
-                if (!empty($fullName)) {
-                    $topicName .= ' ' . $fullName;
+                if (!empty($firstName) || !empty($lastName)) {
+                    $fullName = trim($firstName . ' ' . $lastName);
+                    if (!empty($fullName)) {
+                        $topicName .= ' ' . $fullName;
+                    }
                 }
             }
 
             // Добавляем номер телефона, если доступен
             if (!empty($botUser->phone_number)) {
                 $topicName .= ' ' . $botUser->phone_number;
+            }
+
+            // Добавляем email, если доступен (с учетом ограничения длины)
+            if (!empty($botUser->email)) {
+                // Проверяем, не превысит ли добавление email лимит в 128 символов
+                $potentialName = $topicName . ' ' . $botUser->email;
+                if (mb_strlen($potentialName) <= 128) {
+                    $topicName = $potentialName;
+                } else {
+                    // Если превышает, обрезаем email или не добавляем его
+                    $availableLength = 128 - mb_strlen($topicName) - 1; // -1 для пробела
+                    if ($availableLength > 10) { // Минимум 10 символов для email
+                        $truncatedEmail = mb_substr($botUser->email, 0, $availableLength);
+                        $topicName .= ' ' . $truncatedEmail;
+                    }
+                    // Если места недостаточно, просто не добавляем email
+                }
             }
 
             return $topicName;

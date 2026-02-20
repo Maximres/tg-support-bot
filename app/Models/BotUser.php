@@ -21,6 +21,9 @@ use phpDocumentor\Reflection\Exception;
  * @property int               $chat_id
  * @property string            $platform
  * @property string|null       $phone_number
+ * @property string|null       $full_name
+ * @property string|null       $email
+ * @property \Carbon\Carbon|null $registration_completed_at
  * @property string|null       $custom_topic_name
  * @property bool              $topic_name_edited
  * @property mixed             $aiCondition
@@ -39,6 +42,9 @@ class BotUser extends Model
         'topic_id',
         'platform',
         'phone_number',
+        'full_name',
+        'email',
+        'registration_completed_at',
         'custom_topic_name',
         'topic_name_edited',
         'sequential_number',
@@ -332,6 +338,32 @@ class BotUser extends Model
         $this->custom_topic_name = null;
         $this->topic_name_edited = false;
         $this->save();
+    }
+
+    /**
+     * Проверяет, завершена ли регистрация пользователя
+     *
+     * @return bool
+     */
+    public function isRegistrationCompleted(): bool
+    {
+        return !empty($this->full_name) && 
+               !empty($this->phone_number) && 
+               !empty($this->email) && 
+               !empty($this->registration_completed_at);
+    }
+
+    /**
+     * Проверяет, нужна ли регистрация пользователю
+     * Возвращает true, если отсутствуют все три обязательных поля
+     *
+     * @return bool
+     */
+    public function needsRegistration(): bool
+    {
+        return empty($this->full_name) || 
+               empty($this->phone_number) || 
+               empty($this->email);
     }
 
     /**

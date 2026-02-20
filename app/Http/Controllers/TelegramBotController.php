@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\Ai\EditAiMessage;
 use App\Actions\Telegram\BannedContactMessage;
 use App\Actions\Telegram\CloseTopic;
+use App\Actions\Telegram\EditUserData;
 use App\Actions\Telegram\RenameTopic;
 use App\Actions\Telegram\RequestPhoneFromGroup;
 use App\Actions\Telegram\RestoreTopicName;
@@ -13,6 +14,7 @@ use App\Actions\Telegram\SendBannedMessage;
 use App\Actions\Telegram\SendContactMessage;
 use App\Actions\Telegram\SendPhoneRequestMessage;
 use App\Actions\Telegram\SendStartMessage;
+use App\Actions\Telegram\ShowUserDataMenu;
 use App\DTOs\TelegramUpdateDto;
 use App\DTOs\TGTextMessageDto;
 use App\Jobs\SendTelegramSimpleQueryJob;
@@ -141,6 +143,22 @@ class TelegramBotController
             } elseif ($this->dataHook->callbackData === 'request_phone_from_group') {
                 if ($this->botUser) {
                     (new RequestPhoneFromGroup())->execute($this->botUser);
+                }
+            } elseif ($this->dataHook->callbackData === 'edit_full_name') {
+                if ($this->botUser && $this->dataHook->typeSource === 'private') {
+                    (new EditUserData())->execute($this->dataHook, $this->botUser, 'full_name');
+                }
+            } elseif ($this->dataHook->callbackData === 'edit_phone') {
+                if ($this->botUser && $this->dataHook->typeSource === 'private') {
+                    (new EditUserData())->execute($this->dataHook, $this->botUser, 'phone');
+                }
+            } elseif ($this->dataHook->callbackData === 'edit_email') {
+                if ($this->botUser && $this->dataHook->typeSource === 'private') {
+                    (new EditUserData())->execute($this->dataHook, $this->botUser, 'email');
+                }
+            } elseif ($this->dataHook->callbackData === 'cancel_edit') {
+                if ($this->botUser && $this->dataHook->typeSource === 'private') {
+                    (new EditUserData())->cancel($this->dataHook, $this->botUser);
                 }
             }
 
@@ -283,6 +301,16 @@ class TelegramBotController
                         (new SendStartMessage())->execute($this->dataHook);
                     } elseif (($this->isCommand('/phone', $this->dataHook->text) || $this->isCommand('/share_phone', $this->dataHook->text)) && !$this->isSupergroup()) {
                         (new SendPhoneRequestMessage())->execute($this->dataHook);
+                    } elseif ($this->isCommand('/my_data', $this->dataHook->text) && !$this->isSupergroup()) {
+                        (new ShowUserDataMenu())->execute($this->dataHook, $this->botUser);
+                    } elseif ($this->isCommand('/edit_name', $this->dataHook->text) && !$this->isSupergroup()) {
+                        (new EditUserData())->execute($this->dataHook, $this->botUser, 'full_name');
+                    } elseif ($this->isCommand('/edit_phone', $this->dataHook->text) && !$this->isSupergroup()) {
+                        (new EditUserData())->execute($this->dataHook, $this->botUser, 'phone');
+                    } elseif ($this->isCommand('/edit_email', $this->dataHook->text) && !$this->isSupergroup()) {
+                        (new EditUserData())->execute($this->dataHook, $this->botUser, 'email');
+                    } elseif ($this->isCommand('/cancel', $this->dataHook->text) && !$this->isSupergroup()) {
+                        (new EditUserData())->cancel($this->dataHook, $this->botUser);
                     } elseif ($this->dataHook->text && str_contains($this->dataHook->text, '/ai_generate') && $this->isSupergroup()) {
                         (new SendAiAnswerMessage())->execute($this->dataHook);
                     } elseif ($this->isCommand('/rename_topic', $this->dataHook->text) && $this->isSupergroup()) {
