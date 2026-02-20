@@ -35,7 +35,7 @@ class SendContactMessage
             'methodQuery' => 'sendMessage',
             'chat_id' => config('traffic_source.settings.telegram.group_id'),
             'message_thread_id' => $botUser->topic_id,
-            'text' => $this->createContactMessage($botUser->chat_id, $botUser->platform),
+            'text' => $this->createContactMessage($botUser->chat_id, $botUser->platform, $botUser->phone_number),
             'parse_mode' => 'html',
             'reply_markup' => [
                 'inline_keyboard' => $this->getKeyboard($botUser),
@@ -51,7 +51,7 @@ class SendContactMessage
      *
      * @return string
      */
-    public function createContactMessage(int $chatId, string $platform): string
+    public function createContactMessage(int $chatId, string $platform, ?string $phoneNumber = null): string
     {
         try {
             $textMessage = "<b>КОНТАКТНАЯ ИНФОРМАЦИЯ</b> \n";
@@ -66,6 +66,12 @@ class SendContactMessage
                     $textMessage .= "Ссылка: {$link} \n";
                 }
             }
+            
+            // Добавляем номер телефона, если он есть
+            if (!empty($phoneNumber)) {
+                $textMessage .= "Телефон: <b>{$phoneNumber}</b> \n";
+            }
+            
             return $textMessage;
         } catch (\Throwable $e) {
             return '';
@@ -91,16 +97,29 @@ class SendContactMessage
             ];
         }
 
-        return [
+        $keyboard = [
             [
                 $banButton,
             ],
-            [
+        ];
+
+        // Добавляем кнопку запроса номера, если его еще нет
+        if (empty($botUser->phone_number)) {
+            $keyboard[] = [
                 [
-                    'text' => __('messages.but_close_topic'),
-                    'callback_data' => 'close_topic',
+                    'text' => __('messages.but_request_phone_from_group'),
+                    'callback_data' => 'request_phone_from_group',
                 ],
+            ];
+        }
+
+        $keyboard[] = [
+            [
+                'text' => __('messages.but_close_topic'),
+                'callback_data' => 'close_topic',
             ],
         ];
+
+        return $keyboard;
     }
 }

@@ -9,12 +9,12 @@ use App\Models\BotUser;
 use App\TelegramBot\TelegramMethods;
 
 /**
- * Отправка стартового сообщения
+ * Отправка сообщения с запросом номера телефона
  */
-class SendStartMessage
+class SendPhoneRequestMessage
 {
     /**
-     * Отправка стартового сообщения
+     * Отправка сообщения с кнопкой запроса номера телефона
      *
      * @param TelegramUpdateDto $update
      *
@@ -30,17 +30,31 @@ class SendStartMessage
         if ($update->typeSource === 'private') {
             $botUser = BotUser::getOrCreateByTelegramUpdate($update);
             
-            // Формируем параметры сообщения
-            $messageParams = [
+            // Если номер уже есть, сообщаем об этом
+            if (!empty($botUser->phone_number)) {
+                $messageParamsDTO = TGTextMessageDto::from([
+                    'methodQuery' => 'sendMessage',
+                    'chat_id' => $update->chatId,
+                    'text' => __('messages.phone_already_provided', ['phone' => $botUser->phone_number]),
+                    'parse_mode' => 'html',
+                ]);
+
+                SendTelegramMessageJob::dispatch(
+                    $botUser->id,
+                    $update,
+                    $messageParamsDTO,
+                    'outgoing'
+                );
+                return;
+            }
+
+            // Отправляем сообщение с кнопкой запроса номера
+            $messageParamsDTO = TGTextMessageDto::from([
                 'methodQuery' => 'sendMessage',
                 'chat_id' => $update->chatId,
-                'text' => __('messages.start'),
+                'text' => __('messages.request_phone_message'),
                 'parse_mode' => 'html',
-            ];
-
-            // Добавляем кнопку запроса номера, если у пользователя еще нет номера
-            if (empty($botUser->phone_number)) {
-                $messageParams['reply_markup'] = [
+                'reply_markup' => [
                     'keyboard' => [
                         [
                             [
@@ -51,10 +65,8 @@ class SendStartMessage
                     ],
                     'resize_keyboard' => true,
                     'one_time_keyboard' => true,
-                ];
-            }
-
-            $messageParamsDTO = TGTextMessageDto::from($messageParams);
+                ],
+            ]);
 
             SendTelegramMessageJob::dispatch(
                 $botUser->id,
@@ -65,3 +77,4 @@ class SendStartMessage
         }
     }
 }
+

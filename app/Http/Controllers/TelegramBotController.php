@@ -6,10 +6,12 @@ use App\Actions\Ai\EditAiMessage;
 use App\Actions\Telegram\BannedContactMessage;
 use App\Actions\Telegram\CloseTopic;
 use App\Actions\Telegram\RenameTopic;
+use App\Actions\Telegram\RequestPhoneFromGroup;
 use App\Actions\Telegram\RestoreTopicName;
 use App\Actions\Telegram\SendAiAnswerMessage;
 use App\Actions\Telegram\SendBannedMessage;
 use App\Actions\Telegram\SendContactMessage;
+use App\Actions\Telegram\SendPhoneRequestMessage;
 use App\Actions\Telegram\SendStartMessage;
 use App\DTOs\TelegramUpdateDto;
 use App\DTOs\TGTextMessageDto;
@@ -95,10 +97,18 @@ class TelegramBotController
 
         if ($this->dataHook->typeQuery === 'callback_query') {
             if (str_contains($this->dataHook->callbackData, 'topic_user_ban_')) {
-                $banStatus = $this->dataHook->callbackData === 'topic_user_ban_true';
-                (new BannedContactMessage())->execute($this->botUser, $banStatus, $this->dataHook->messageId);
+                if ($this->botUser) {
+                    $banStatus = $this->dataHook->callbackData === 'topic_user_ban_true';
+                    (new BannedContactMessage())->execute($this->botUser, $banStatus, $this->dataHook->messageId);
+                }
             } elseif ($this->dataHook->callbackData === 'close_topic') {
-                (new CloseTopic())->execute($this->botUser);
+                if ($this->botUser) {
+                    (new CloseTopic())->execute($this->botUser);
+                }
+            } elseif ($this->dataHook->callbackData === 'request_phone_from_group') {
+                if ($this->botUser) {
+                    (new RequestPhoneFromGroup())->execute($this->botUser);
+                }
             }
 
             die();
@@ -181,6 +191,9 @@ class TelegramBotController
                 if ($this->dataHook->text === '/contact' && $this->isSupergroup()) {
                     (new SendContactMessage())->execute($this->botUser);
                     die();
+                } elseif (($this->dataHook->text === '/request_phone' || $this->dataHook->text === '/get_phone') && $this->isSupergroup() && $this->botUser) {
+                    (new RequestPhoneFromGroup())->execute($this->botUser);
+                    die();
                 }
             }
 
@@ -232,6 +245,8 @@ class TelegramBotController
                 case 'message':
                     if ($this->dataHook->text === '/start' && !$this->isSupergroup()) {
                         (new SendStartMessage())->execute($this->dataHook);
+                    } elseif (($this->dataHook->text === '/phone' || $this->dataHook->text === '/share_phone') && !$this->isSupergroup()) {
+                        (new SendPhoneRequestMessage())->execute($this->dataHook);
                     } elseif (str_contains($this->dataHook->text, '/ai_generate') && $this->isSupergroup()) {
                         (new SendAiAnswerMessage())->execute($this->dataHook);
                     } elseif (str_starts_with($this->dataHook->text, '/rename_topic') && $this->isSupergroup()) {
