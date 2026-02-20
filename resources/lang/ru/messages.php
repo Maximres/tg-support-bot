@@ -23,6 +23,10 @@ return [
     // Описания команд для клиентов
     'command_start_description' => 'Начать работу с ботом',
     'command_phone_description' => 'Поделиться номером телефона',
+    'command_my_data_description' => 'Показать мои данные',
+    'command_edit_name_description' => 'Изменить ФИО',
+    'command_edit_phone_description' => 'Изменить телефон',
+    'command_edit_email_description' => 'Изменить Email',
 
     // Описания команд для администраторов
     'command_contact_description' => 'Показать контактную информацию клиента',

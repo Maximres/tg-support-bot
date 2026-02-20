@@ -26,6 +26,22 @@ class SetBotCommands
                 'command' => 'phone',
                 'description' => __('messages.command_phone_description'),
             ],
+            [
+                'command' => 'my_data',
+                'description' => __('messages.command_my_data_description'),
+            ],
+            [
+                'command' => 'edit_name',
+                'description' => __('messages.command_edit_name_description'),
+            ],
+            [
+                'command' => 'edit_phone',
+                'description' => __('messages.command_edit_phone_description'),
+            ],
+            [
+                'command' => 'edit_email',
+                'description' => __('messages.command_edit_email_description'),
+            ],
         ];
 
         $params = [
