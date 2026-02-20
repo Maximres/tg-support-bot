@@ -66,10 +66,15 @@ class TopicCreateJob implements ShouldQueue
 
             $topicName = $this->generateNameTopic($this->botUser);
 
+            // При создании топика после регистрации, если от клиента не было сообщений,
+            // иконка должна быть 'incoming' (клиент ввел данные и ожидает от нас сообщения)
+            // Иконка 'outgoing' устанавливается автоматически при отправке сообщения клиенту через updateTopic
+            $iconEmojiId = __('icons.incoming');
+
             $response = $this->telegramMethods->sendQueryTelegram('createForumTopic', [
                 'chat_id' => config('traffic_source.settings.telegram.group_id'),
                 'name' => $topicName,
-                'icon_custom_emoji_id' => __('icons.incoming'),
+                'icon_custom_emoji_id' => $iconEmojiId,
             ]);
 
             // ✅ Успешная отправка
