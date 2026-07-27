@@ -20,6 +20,11 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   pgdb:
     image: postgres:15
@@ -39,6 +44,11 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   redis:
     image: redis:7-alpine
@@ -53,6 +63,11 @@ services:
       timeout: 3s
       retries: 5
       start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   nginx:
     image: nginx:alpine
@@ -76,6 +91,11 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   queue:
     build: .
@@ -99,6 +119,11 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 volumes:
   pgdata:
 
