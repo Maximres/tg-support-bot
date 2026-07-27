@@ -4,15 +4,14 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class () extends Migration {
     /**
      * Run the migrations.
      */
     public function up(): void
     {
         Schema::table('bot_users', function (Blueprint $table) {
-            $table->integer('contact_info_message_id')->nullable()->after('topic_id');
+            $table->unsignedBigInteger('access_message_id')->nullable()->after('contact_info_message_id');
         });
     }
 
@@ -22,8 +21,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('bot_users', function (Blueprint $table) {
-            $table->dropColumn('contact_info_message_id');
+            $table->dropColumn('access_message_id');
         });
     }
 };
-

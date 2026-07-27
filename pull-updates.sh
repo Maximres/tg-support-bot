@@ -334,6 +334,16 @@ else
     echo -e "${GREEN}✓ Новых миграций нет${NC}"
 fi
 
+# 8a. ОБНОВЛЕНИЕ КОМАНД БОТА И БЭКАФИЛЛ ДОСТУПА К КОДАМ
+echo ""
+echo -e "${BLUE}8a. Обновление команд бота и рассылка кнопок доступа...${NC}"
+echo "----------------------------------------"
+
+# Безопасно запускать на каждом деплое: setMyCommands идемпотентен, а бэкафилл
+# трогает только сотрудников без ранее отправленного сообщения с кнопками
+run_step "docker-compose exec -T app php artisan telegram:set-commands" "Обновление команд бота"
+run_step "docker-compose exec -T app php artisan telegram:backfill-access-messages" "Рассылка сообщений с кнопками доступа"
+
 # 9. ПЕРЕЗАПУСК КОНТЕЙНЕРОВ С ПРОВЕРКОЙ HEALTH CHECKS
 echo ""
 echo -e "${BLUE}9. Перезапуск контейнеров с проверкой health checks...${NC}"

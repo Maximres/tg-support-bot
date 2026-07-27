@@ -13,9 +13,14 @@ use App\Actions\Telegram\SendAiAnswerMessage;
 use App\Actions\Telegram\SendBannedMessage;
 use App\Actions\Telegram\SendContactMessage;
 use App\Actions\Telegram\SendPhoneRequestMessage;
+use App\Actions\Telegram\SendSafeCode;
 use App\Actions\Telegram\SendStartMessage;
+use App\Actions\Telegram\SetTrustedValue;
+use App\Actions\Telegram\ShowTrustedValue;
 use App\Actions\Telegram\ShowUserDataMenu;
+use App\Actions\Telegram\TrustContactMessage;
 use App\DTOs\TelegramUpdateDto;
+use App\Enums\SafeCodeType;
 use App\DTOs\TGTextMessageDto;
 use App\Jobs\SendTelegramSimpleQueryJob;
 use App\Models\BotUser;
@@ -136,6 +141,11 @@ class TelegramBotController
                     $banStatus = $this->dataHook->callbackData === 'topic_user_ban_true';
                     (new BannedContactMessage())->execute($this->botUser, $banStatus, $this->dataHook->messageId);
                 }
+            } elseif (str_contains($this->dataHook->callbackData, 'topic_user_trust_')) {
+                if ($this->botUser) {
+                    $trustStatus = $this->dataHook->callbackData === 'topic_user_trust_true';
+                    (new TrustContactMessage())->execute($this->botUser, $trustStatus);
+                }
             } elseif ($this->dataHook->callbackData === 'close_topic') {
                 if ($this->botUser) {
                     (new CloseTopic())->execute($this->botUser);
@@ -159,6 +169,11 @@ class TelegramBotController
             } elseif ($this->dataHook->callbackData === 'cancel_edit') {
                 if ($this->botUser && $this->dataHook->typeSource === 'private') {
                     (new EditUserData())->cancel($this->dataHook, $this->botUser);
+                }
+            } elseif (str_contains($this->dataHook->callbackData, 'access_show_')) {
+                if ($this->botUser && $this->dataHook->typeSource === 'private') {
+                    $type = SafeCodeType::tryFrom(str_replace('access_show_', '', $this->dataHook->callbackData));
+                    (new ShowTrustedValue())->execute($this->dataHook, $this->botUser, $type);
                 }
             }
 
@@ -248,6 +263,17 @@ class TelegramBotController
                 } elseif (($this->isCommand('/request_phone', $this->dataHook->text) || $this->isCommand('/get_phone', $this->dataHook->text)) && $this->isSupergroup() && $this->botUser) {
                     (new RequestPhoneFromGroup())->execute($this->botUser);
                     die();
+                } elseif ($this->isCommand('/set_code', $this->dataHook->text) && $this->isSupergroup()) {
+                    // Глобальная команда, не привязана к топику конкретного пользователя,
+                    // поэтому обрабатывается до резолва $this->botUser по topic_id
+                    (new SetTrustedValue())->execute($this->dataHook, SafeCodeType::SAFE);
+                    die();
+                } elseif ($this->isCommand('/set_building_code', $this->dataHook->text) && $this->isSupergroup()) {
+                    (new SetTrustedValue())->execute($this->dataHook, SafeCodeType::BUILDING);
+                    die();
+                } elseif ($this->isCommand('/set_org_link', $this->dataHook->text) && $this->isSupergroup()) {
+                    (new SetTrustedValue())->execute($this->dataHook, SafeCodeType::ORG_LINK);
+                    die();
                 }
             }
 
@@ -311,6 +337,8 @@ class TelegramBotController
                         (new EditUserData())->execute($this->dataHook, $this->botUser, 'email');
                     } elseif ($this->isCommand('/cancel', $this->dataHook->text) && !$this->isSupergroup()) {
                         (new EditUserData())->cancel($this->dataHook, $this->botUser);
+                    } elseif ($this->isCommand('/code', $this->dataHook->text) && !$this->isSupergroup()) {
+                        (new SendSafeCode())->execute($this->botUser);
                     } elseif ($this->dataHook->text && str_contains($this->dataHook->text, '/ai_generate') && $this->isSupergroup()) {
                         (new SendAiAnswerMessage())->execute($this->dataHook);
                     } elseif ($this->isCommand('/rename_topic', $this->dataHook->text) && $this->isSupergroup()) {

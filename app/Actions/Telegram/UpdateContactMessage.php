@@ -42,7 +42,8 @@ class UpdateContactMessage
                 $botUser->phone_number,
                 $botUser->full_name,
                 $botUser->email,
-                $botUser->isBanned()
+                $botUser->isBanned(),
+                $botUser->isTrusted()
             );
             $keyboard = $sendContactMessage->getKeyboard($botUser);
 

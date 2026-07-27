@@ -16,6 +16,7 @@ use Spatie\LaravelData\Data;
  * @property string      $typeQuery
  * @property string      $typeSource
  * @property int|null    $chatId
+ * @property int|null    $fromUserId
  * @property array|null  $replyToMessage
  * @property int|null    $messageThreadId
  * @property int|null    $messageId
@@ -40,6 +41,7 @@ class TelegramUpdateDto extends Data
         public bool    $editedTopicStatus = false,
         public bool    $pinnedMessageStatus = false,
         public ?int    $chatId = null,
+        public ?int    $fromUserId = null,
         public ?array  $replyToMessage = null,
         public ?int    $messageThreadId = null,
         public ?int    $messageId = null,
@@ -86,6 +88,7 @@ class TelegramUpdateDto extends Data
                 editedTopicStatus: !empty($data['message']['forum_topic_edited']),
                 pinnedMessageStatus: !empty($data['message']['pinned_message']),
                 chatId: self::extractChatId($data, $type),
+                fromUserId: self::extractFromUserId($data, $type),
                 replyToMessage: self::extractReplayToMessage($data),
                 messageThreadId: self::extractMessageThreadId($data, $type),
                 messageId: self::extractMessageId($data, $type),
@@ -147,6 +150,17 @@ class TelegramUpdateDto extends Data
     private static function extractChatId(array $data, string $type): ?int
     {
         return $data[$type]['chat']['id'] ?? $data['callback_query']['message']['chat']['id'] ?? null;
+    }
+
+    /**
+     * @param array  $data
+     * @param string $type
+     *
+     * @return int|null
+     */
+    private static function extractFromUserId(array $data, string $type): ?int
+    {
+        return $data[$type]['from']['id'] ?? $data['callback_query']['from']['id'] ?? null;
     }
 
     /**

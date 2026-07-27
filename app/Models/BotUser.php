@@ -31,6 +31,8 @@ use phpDocumentor\Reflection\Exception;
  * @property mixed             $lastMessageManager
  * @property ExternalUser|null $externalUser
  * @property bool              $is_banned
+ * @property bool              $is_trusted
+ * @property int|null          $access_message_id
  */
 class BotUser extends Model
 {
@@ -52,6 +54,9 @@ class BotUser extends Model
         'sequential_number',
         'is_banned',
         'banned_at',
+        'is_trusted',
+        'trusted_at',
+        'access_message_id',
     ];
 
     /**
@@ -286,6 +291,26 @@ class BotUser extends Model
     public function isBanned(): bool
     {
         return $this->is_banned ?? false;
+    }
+
+    /**
+     * Проверяет, есть ли у пользователя доступ к коду сейфа (одобрен админом)
+     *
+     * @return bool
+     */
+    public function isTrusted(): bool
+    {
+        return $this->is_trusted ?? false;
+    }
+
+    /**
+     * Проверяет, отправлено ли сотруднику закреплённое сообщение с кнопками доступа
+     *
+     * @return bool
+     */
+    public function hasAccessMessage(): bool
+    {
+        return !empty($this->access_message_id);
     }
 
     /**

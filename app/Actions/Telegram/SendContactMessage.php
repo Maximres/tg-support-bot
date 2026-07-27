@@ -35,7 +35,7 @@ class SendContactMessage
             'methodQuery' => 'sendMessage',
             'chat_id' => config('traffic_source.settings.telegram.group_id'),
             'message_thread_id' => $botUser->topic_id,
-            'text' => $this->createContactMessage($botUser->chat_id, $botUser->platform, $botUser->phone_number, $botUser->full_name, $botUser->email, $botUser->isBanned()),
+            'text' => $this->createContactMessage($botUser->chat_id, $botUser->platform, $botUser->phone_number, $botUser->full_name, $botUser->email, $botUser->isBanned(), $botUser->isTrusted()),
             'parse_mode' => 'html',
             'reply_markup' => [
                 'inline_keyboard' => $this->getKeyboard($botUser),
@@ -54,16 +54,20 @@ class SendContactMessage
      *
      * @return string
      */
-    public function createContactMessage(int $chatId, string $platform, ?string $phoneNumber = null, ?string $fullName = null, ?string $email = null, bool $isBanned = false): string
+    public function createContactMessage(int $chatId, string $platform, ?string $phoneNumber = null, ?string $fullName = null, ?string $email = null, bool $isBanned = false, bool $isTrusted = false): string
     {
         try {
             $textMessage = '';
-            
+
             // Добавляем статус блокировки, если пользователь заблокирован
             if ($isBanned) {
                 $textMessage .= "<b>🚫 ПОЛЬЗОВАТЕЛЬ ЗАБЛОКИРОВАН 🚫</b> \n\n";
             }
-            
+
+            $textMessage .= $isTrusted
+                ? "✅ Доверенный (есть доступ к кодам и орг. информации) \n\n"
+                : "◻️ Не доверенный (нет доступа к кодам и орг. информации) \n\n";
+
             $textMessage .= "<b>КОНТАКТНАЯ ИНФОРМАЦИЯ</b> \n";
             $textMessage .= "Источник: {$platform} \n";
             $textMessage .= "ID: {$chatId} \n";
@@ -117,9 +121,24 @@ class SendContactMessage
             ];
         }
 
+        if ($botUser->isTrusted()) {
+            $trustButton = [
+                'text' => __('messages.but_trust_user_false'),
+                'callback_data' => 'topic_user_trust_false',
+            ];
+        } else {
+            $trustButton = [
+                'text' => __('messages.but_trust_user_true'),
+                'callback_data' => 'topic_user_trust_true',
+            ];
+        }
+
         $keyboard = [
             [
                 $banButton,
+            ],
+            [
+                $trustButton,
             ],
         ];
 

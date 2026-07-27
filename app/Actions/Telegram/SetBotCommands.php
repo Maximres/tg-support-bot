@@ -42,6 +42,10 @@ class SetBotCommands
                 'command' => 'edit_email',
                 'description' => __('messages.command_edit_email_description'),
             ],
+            [
+                'command' => 'code',
+                'description' => __('messages.command_code_description'),
+            ],
         ];
 
         $params = [
@@ -77,6 +81,18 @@ class SetBotCommands
             [
                 'command' => 'restore_topic_name',
                 'description' => __('messages.command_restore_topic_name_description'),
+            ],
+            [
+                'command' => 'set_code',
+                'description' => __('messages.command_set_code_description'),
+            ],
+            [
+                'command' => 'set_building_code',
+                'description' => __('messages.command_set_building_code_description'),
+            ],
+            [
+                'command' => 'set_org_link',
+                'description' => __('messages.command_set_org_link_description'),
             ],
         ];
 

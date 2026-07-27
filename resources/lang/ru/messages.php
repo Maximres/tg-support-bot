@@ -8,6 +8,24 @@ return [
     'but_ban_user_true' => '🚫 Заблокировать',
     'but_ban_user_false' => '🔓 Разблокировать',
 
+    'but_trust_user_true' => '✅ Открыть доступ к кодам',
+    'but_trust_user_false' => '🔒 Отозвать доступ к кодам',
+
+    // Оставлено для обратной совместимости с командой /code
+    'safe_code_not_trusted' => 'Доступ к коду сейфа не открыт. Обратитесь к администратору.',
+    'safe_code_not_set' => 'Код сейфа ещё не задан.',
+    'safe_code_value' => 'Код от сейфа: <code>:code</code>',
+
+    // Личный доступ к кодам и орг. информации по кнопке
+    'but_access_open_org_link' => 'Открыть',
+    'access_message_text' => "Нажмите на нужную кнопку, чтобы получить код от сейфа, код от здания или ссылку на орг. информацию.\nЕсли доступ ещё не открыт, вы получите соответствующее уведомление — обратитесь к администратору.",
+    'access_not_trusted' => 'Доступ не открыт. Обратитесь к администратору.',
+    'access_value_not_set' => ':type ещё не задан(а).',
+    'access_value_reveal' => ':type: :value',
+    'access_org_link_not_set' => 'Ссылка на орг. информацию ещё не задана.',
+    'access_org_link_message' => 'Актуальная ссылка на орг. информацию:',
+    'access_rotated' => '🔐 :type обновлён(а).',
+
     'but_close_topic' => '🚪 Закрыть обращение',
     'message_close_topic' => 'Ваше обращение закрыто!',
 
@@ -27,16 +45,34 @@ return [
     'command_edit_name_description' => 'Изменить ФИО',
     'command_edit_phone_description' => 'Изменить телефон',
     'command_edit_email_description' => 'Изменить Email',
+    'command_code_description' => 'Получить код от сейфа',
 
     // Описания команд для администраторов
     'command_contact_description' => 'Показать контактную информацию клиента',
     'command_request_phone_description' => 'Запросить номер телефона у клиента',
     'command_rename_topic_description' => 'Переименовать топик (использование: /rename_topic новое название)',
     'command_restore_topic_name_description' => 'Восстановить название топика по умолчанию',
+    'command_set_code_description' => 'Задать новый код сейфа (использование: /set_code значение)',
+    'command_set_building_code_description' => 'Задать новый код от здания (использование: /set_building_code значение)',
+    'command_set_org_link_description' => 'Задать ссылку на орг. информацию (использование: /set_org_link ссылка)',
     'command_rename_topic_request' => "Пожалуйста, укажите новое название топика после команды:
 <code>/rename_topic новое название</code>
 
 Пример: <code>/rename_topic Важное обращение</code>",
+
+    // Установка кодов/ссылки администратором
+    'command_admin_only' => '⛔ Эта команда доступна только администраторам группы.',
+    'command_admin_check_failed' => '⚠️ Не удалось проверить права администратора, попробуйте ещё раз.',
+    'command_set_value_request' => "Пожалуйста, укажите новое значение после команды:
+<code>:command значение</code>
+
+Пример: <code>:example</code>",
+    'command_set_value_invalid' => '⚠️ Некорректное значение: без переносов строк и не длиннее 256 символов.',
+    'command_set_org_link_invalid' => '⚠️ Пожалуйста, укажите корректную ссылку, начинающуюся с http:// или https://.',
+    'command_set_value_unchanged' => 'ℹ️ :type уже установлен(а) — значение не изменилось.',
+    'command_set_value_saved' => '✅ :type обновлён(а). Доверенные пользователи уведомлены.',
+    'command_set_org_link_saved' => '✅ Ссылка на орг. информацию обновлена.',
+    'command_set_value_error' => '❌ Не удалось сохранить значение. Попробуйте ещё раз.',
 
     // Регистрация пользователя
     'registration' => [
