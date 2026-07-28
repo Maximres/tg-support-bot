@@ -12,6 +12,7 @@ use App\Actions\Telegram\RestoreTopicName;
 use App\Actions\Telegram\SendAiAnswerMessage;
 use App\Actions\Telegram\SendBannedMessage;
 use App\Actions\Telegram\SendContactMessage;
+use App\Actions\Telegram\SendAccessMessage;
 use App\Actions\Telegram\SendPhoneRequestMessage;
 use App\Actions\Telegram\SendSafeCode;
 use App\Actions\Telegram\SendStartMessage;
@@ -366,6 +367,10 @@ class TelegramBotController
                         (new EditUserData())->cancel($this->dataHook, $this->botUser);
                     } elseif ($this->isCommand('/code', $this->dataHook->text) && !$this->isSupergroup()) {
                         (new SendSafeCode())->execute($this->botUser);
+                    } elseif ($this->isCommand('/restore_access', $this->dataHook->text) && !$this->isSupergroup()) {
+                        // На случай, если сотрудник случайно удалил закреплённое сообщение
+                        // с кнопками доступа к кодам — пересылаем его заново
+                        (new SendAccessMessage())->execute($this->botUser, true);
                     } elseif ($this->dataHook->text && str_contains($this->dataHook->text, '/ai_generate') && $this->isSupergroup()) {
                         (new SendAiAnswerMessage())->execute($this->dataHook);
                     } elseif ($this->isCommand('/rename_topic', $this->dataHook->text) && $this->isSupergroup()) {

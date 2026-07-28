@@ -15,16 +15,18 @@ class SendAccessMessage
 {
     /**
      * @param BotUser $botUser
+     * @param bool    $force Отправить заново, даже если сообщение уже отправлялось ранее
+     *                       (например, сотрудник случайно удалил закреплённое сообщение)
      *
      * @return void
      */
-    public function execute(BotUser $botUser): void
+    public function execute(BotUser $botUser, bool $force = false): void
     {
         if ($botUser->platform !== 'telegram' || empty($botUser->chat_id)) {
             return;
         }
 
-        if ($botUser->isBanned() || $botUser->hasAccessMessage()) {
+        if ($botUser->isBanned() || (!$force && $botUser->hasAccessMessage())) {
             return;
         }
 
@@ -38,7 +40,7 @@ class SendAccessMessage
             ],
         ]);
 
-        SendAccessMessageWithCallbackJob::dispatch($botUser->id, $queryParams);
+        SendAccessMessageWithCallbackJob::dispatch($botUser->id, $queryParams, $force);
     }
 
     /**

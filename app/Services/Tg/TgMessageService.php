@@ -7,6 +7,7 @@ use App\Actions\Telegram\HandleRegistrationFlow;
 use App\Actions\Telegram\UpdateContactMessage;
 use App\Actions\Telegram\UpdateTopicName;
 use App\DTOs\TelegramUpdateDto;
+use App\DTOs\TGTextMessageDto;
 use App\Jobs\SendMessage\SendTelegramMessageJob;
 use App\Logging\LokiLogger;
 use App\Services\ActionService\Send\FromTgMessageService;
@@ -48,10 +49,25 @@ class TgMessageService extends FromTgMessageService
                 
                 // Edge case: определение первого контакта - если пользователь нуждается в регистрации
                 // и нет состояния, запускаем регистрацию (кроме команды /start, которая обрабатывается отдельно)
-                if ($this->botUser->needsRegistration() && 
+                if ($this->botUser->needsRegistration() &&
                     !$registrationService->getState($this->update->chatId) &&
                     !empty($this->update->text) &&
                     !str_starts_with($this->update->text, '/start')) {
+                    // Клиент написал не /start, а сразу вопрос/сообщение — коротко
+                    // подтверждаем, что оно получено, чтобы не создавалось впечатление,
+                    // что бот его проигнорировал, прежде чем запустить регистрацию
+                    SendTelegramMessageJob::dispatch(
+                        $this->botUser->id,
+                        $this->update,
+                        TGTextMessageDto::from([
+                            'methodQuery' => 'sendMessage',
+                            'chat_id' => $this->update->chatId,
+                            'text' => __('messages.registration.received_message_first'),
+                            'parse_mode' => 'html',
+                        ]),
+                        'outgoing'
+                    );
+
                     // Запускаем регистрацию через SendStartMessage
                     (new \App\Actions\Telegram\SendStartMessage())->execute($this->update);
                     return;

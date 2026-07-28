@@ -86,6 +86,15 @@ class HandleRegistrationFlow
 
             // Edge case: только текстовые сообщения обрабатываем для регистрации
             if (empty($update->text)) {
+                // Если пользователь сейчас ожидаемо в процессе регистрации/редактирования
+                // и прислал не текст (фото/стикер/голосовое) — явно просим текст, а не
+                // молча игнорируем: иначе флоу зависает без объяснения причины
+                $activeState = $this->registrationService->getState($update->chatId);
+                if ($activeState !== null && $this->registrationService->isValidState($activeState)) {
+                    $this->sendValidationError($update, $botUser, __('messages.registration.validation.text_required'));
+                    return true;
+                }
+
                 return false;
             }
 

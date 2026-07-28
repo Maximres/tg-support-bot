@@ -46,6 +46,10 @@ class SetBotCommands
                 'command' => 'code',
                 'description' => __('messages.command_code_description'),
             ],
+            [
+                'command' => 'restore_access',
+                'description' => __('messages.command_restore_access_description'),
+            ],
         ];
 
         $params = [

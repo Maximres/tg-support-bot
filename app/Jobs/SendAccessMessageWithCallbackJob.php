@@ -30,6 +30,7 @@ class SendAccessMessageWithCallbackJob implements ShouldQueue
     public function __construct(
         public int $botUserId,
         public TGTextMessageDto $queryParams,
+        public bool $force = false,
     ) {
     }
 
@@ -38,8 +39,18 @@ class SendAccessMessageWithCallbackJob implements ShouldQueue
         try {
             $botUser = BotUser::find($this->botUserId);
 
-            if (!$botUser || $botUser->hasAccessMessage()) {
+            if (!$botUser || (!$this->force && $botUser->hasAccessMessage())) {
                 return;
+            }
+
+            // При принудительной пересылке (например, сотрудник удалил закреплённое
+            // сообщение) на всякий случай снимаем старый пин — не критично, если
+            // старого сообщения уже не существует, ошибка просто игнорируется
+            if ($this->force && $botUser->hasAccessMessage()) {
+                TelegramMethods::sendQueryTelegram('unpinChatMessage', [
+                    'chat_id' => $botUser->chat_id,
+                    'message_id' => $botUser->access_message_id,
+                ]);
             }
 
             $response = TelegramMethods::sendQueryTelegram(
