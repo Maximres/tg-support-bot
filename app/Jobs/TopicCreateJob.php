@@ -131,6 +131,12 @@ class TopicCreateJob implements ShouldQueue
             ]);
         } catch (\Throwable $e) {
             (new LokiLogger())->logException($e);
+            Log::error('TopicCreateJob: исключение при создании топика', [
+                'bot_user_id' => $this->botUserId,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
         }
     }
 
