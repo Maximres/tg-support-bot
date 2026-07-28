@@ -76,9 +76,36 @@ class TelegramBotController
             }
         }
 
+        if (empty($this->platform) && $this->dataHook->typeSource === 'supergroup' && $this->isGlobalAdminCommand($this->dataHook->text)) {
+            // Глобальные команды администратора (/set_code и т.п.) не привязаны к топику
+            // конкретного сотрудника, поэтому в General (или любом другом непривязанном
+            // топике) обычное разрешение BotUser по topic_id ничего не найдёт — не убиваем
+            // выполнение раньше времени, дав bot_query() самому обработать команду.
+            $this->platform = 'telegram';
+        }
+
         if (empty($this->platform)) {
             die();
         }
+    }
+
+    /**
+     * Проверяет, является ли текст одной из глобальных команд администратора,
+     * не привязанных к топику конкретного сотрудника
+     *
+     * @param string|null $text
+     *
+     * @return bool
+     */
+    private function isGlobalAdminCommand(?string $text): bool
+    {
+        foreach (['/set_code', '/set_building_code', '/set_org_link'] as $command) {
+            if ($this->isCommand($command, $text)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
