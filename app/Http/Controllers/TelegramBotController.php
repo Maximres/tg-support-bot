@@ -366,7 +366,11 @@ class TelegramBotController
                     } elseif ($this->isCommand('/cancel', $this->dataHook->text) && !$this->isSupergroup()) {
                         (new EditUserData())->cancel($this->dataHook, $this->botUser);
                     } elseif ($this->isCommand('/code', $this->dataHook->text) && !$this->isSupergroup()) {
-                        (new SendSafeCode())->execute($this->botUser);
+                        (new SendSafeCode())->execute($this->botUser, SafeCodeType::SAFE);
+                    } elseif ($this->isCommand('/building_code', $this->dataHook->text) && !$this->isSupergroup()) {
+                        (new SendSafeCode())->execute($this->botUser, SafeCodeType::BUILDING);
+                    } elseif ($this->isCommand('/org_link', $this->dataHook->text) && !$this->isSupergroup()) {
+                        (new SendSafeCode())->execute($this->botUser, SafeCodeType::ORG_LINK);
                     } elseif ($this->isCommand('/restore_access', $this->dataHook->text) && !$this->isSupergroup()) {
                         // На случай, если сотрудник случайно удалил закреплённое сообщение
                         // с кнопками доступа к кодам — пересылаем его заново

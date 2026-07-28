@@ -11,10 +11,9 @@ return [
     'but_trust_user_true' => '✅ Открыть доступ к кодам',
     'but_trust_user_false' => '🔒 Отозвать доступ к кодам',
 
-    // Оставлено для обратной совместимости с командой /code
-    'safe_code_not_trusted' => 'Доступ к коду сейфа не открыт. Обратитесь к администратору.',
-    'safe_code_not_set' => 'Код сейфа ещё не задан.',
-    'safe_code_value' => 'Код от сейфа: <code>:code</code>',
+    // Команды /code, /building_code, /org_link — текстовый аналог кнопок
+    'command_code_value' => ':type: <code>:code</code>',
+    'command_code_not_set' => ':type ещё не задан(а).',
 
     // Личный доступ к кодам и орг. информации по кнопке
     'but_access_open_org_link' => 'Открыть',
@@ -46,6 +45,8 @@ return [
     'command_edit_phone_description' => 'Изменить телефон',
     'command_edit_email_description' => 'Изменить Email',
     'command_code_description' => 'Получить код от сейфа',
+    'command_building_code_description' => 'Получить код от здания',
+    'command_org_link_description' => 'Получить ссылку на орг. информацию',
     'command_restore_access_description' => 'Восстановить сообщение с кнопками доступа к кодам',
 
     // Описания команд для администраторов

@@ -47,6 +47,14 @@ class SetBotCommands
                 'description' => __('messages.command_code_description'),
             ],
             [
+                'command' => 'building_code',
+                'description' => __('messages.command_building_code_description'),
+            ],
+            [
+                'command' => 'org_link',
+                'description' => __('messages.command_org_link_description'),
+            ],
+            [
                 'command' => 'restore_access',
                 'description' => __('messages.command_restore_access_description'),
             ],
