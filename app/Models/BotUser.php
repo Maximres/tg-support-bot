@@ -185,8 +185,12 @@ class BotUser extends Model
      *
      * @return BotUser|null
      */
-    public static function getByTopicId(int $messageThreadId): ?BotUser
+    public static function getByTopicId(?int $messageThreadId): ?BotUser
     {
+        if ($messageThreadId === null) {
+            return null;
+        }
+
         try {
             return self::where('topic_id', $messageThreadId)
                 ->with('externalUser')
