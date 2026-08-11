@@ -60,6 +60,33 @@ class BotUser extends Model
     ];
 
     /**
+     * Не даёт сохранить registration_completed_at, если хотя бы одно из
+     * обязательных полей ещё не заполнено — иначе needsRegistration()
+     * и registration_completed_at расходятся (например, при точечной
+     * правке записи вручную), и бот повторно запускает регистрацию
+     * для формально "завершённого" пользователя.
+     *
+     * @return void
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (BotUser $botUser) {
+            if ($botUser->registration_completed_at !== null &&
+                (empty($botUser->full_name) || empty($botUser->phone_number) || empty($botUser->email))
+            ) {
+                Log::warning('BotUser: попытка сохранить registration_completed_at при неполных данных — отменено', [
+                    'bot_user_id' => $botUser->id,
+                    'full_name' => $botUser->full_name,
+                    'phone_number' => $botUser->phone_number,
+                    'email' => $botUser->email,
+                ]);
+
+                $botUser->registration_completed_at = null;
+            }
+        });
+    }
+
+    /**
      * @return HasOne
      */
     public function externalUser(): HasOne
