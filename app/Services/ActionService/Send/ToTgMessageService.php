@@ -4,7 +4,7 @@ namespace App\Services\ActionService\Send;
 
 use App\DTOs\TGTextMessageDto;
 use App\Models\BotUser;
-use phpDocumentor\Reflection\Exception;
+use RuntimeException;
 
 /**
  * Class ToTgMessageService
@@ -22,29 +22,28 @@ abstract class ToTgMessageService extends TemplateMessageService
 
     protected TGTextMessageDto $messageParamsDTO;
 
+    /**
+     * @throws RuntimeException если по chatId не удалось найти/создать пользователя
+     */
     public function __construct(mixed $update)
     {
-        try {
-            $this->update = $update;
+        $this->update = $update;
 
-            $this->typeMessage = 'incoming';
+        $this->typeMessage = 'incoming';
 
-            $chatId = $this->update->chatId ?? $this->update->from_id;
+        $chatId = $this->update->chatId ?? $this->update->from_id;
 
-            $this->botUser = BotUser::getUserByChatId($chatId, $this->source);
-            if (empty($this->botUser)) {
-                throw new Exception('Пользователя не существует!');
-            }
-
-            $this->messageParamsDTO = TGTextMessageDto::from([
-                'methodQuery' => 'sendMessage',
-                'typeSource' => 'private',
-                'chat_id' => config('traffic_source.settings.telegram.group_id'),
-                'message_thread_id' => $this->botUser->topic_id,
-            ]);
-        } catch (Exception $e) {
-            die();
+        $this->botUser = BotUser::getUserByChatId($chatId, $this->source);
+        if (empty($this->botUser)) {
+            throw new RuntimeException('Пользователя не существует!');
         }
+
+        $this->messageParamsDTO = TGTextMessageDto::from([
+            'methodQuery' => 'sendMessage',
+            'typeSource' => 'private',
+            'chat_id' => config('traffic_source.settings.telegram.group_id'),
+            'message_thread_id' => $this->botUser->topic_id,
+        ]);
     }
 
     /**
