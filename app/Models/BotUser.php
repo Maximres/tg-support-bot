@@ -25,6 +25,7 @@ use phpDocumentor\Reflection\Exception;
  * @property string|null       $full_name
  * @property string|null       $email
  * @property \Carbon\Carbon|null $registration_completed_at
+ * @property \Carbon\Carbon|null $offer_accepted_at
  * @property string|null       $custom_topic_name
  * @property bool              $topic_name_edited
  * @property mixed             $aiCondition
@@ -49,6 +50,7 @@ class BotUser extends Model
         'full_name',
         'email',
         'registration_completed_at',
+        'offer_accepted_at',
         'custom_topic_name',
         'topic_name_edited',
         'sequential_number',
@@ -57,6 +59,10 @@ class BotUser extends Model
         'is_trusted',
         'trusted_at',
         'access_message_id',
+    ];
+
+    protected $casts = [
+        'offer_accepted_at' => 'datetime',
     ];
 
     /**
@@ -342,6 +348,16 @@ class BotUser extends Model
     public function hasAccessMessage(): bool
     {
         return !empty($this->access_message_id);
+    }
+
+    /**
+     * Проверяет, принял ли сотрудник условия договора-оферты
+     *
+     * @return bool
+     */
+    public function hasAcceptedOffer(): bool
+    {
+        return !empty($this->offer_accepted_at);
     }
 
     /**

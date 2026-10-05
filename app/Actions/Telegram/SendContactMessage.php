@@ -35,7 +35,7 @@ class SendContactMessage
             'methodQuery' => 'sendMessage',
             'chat_id' => config('traffic_source.settings.telegram.group_id'),
             'message_thread_id' => $botUser->topic_id,
-            'text' => $this->createContactMessage($botUser->chat_id, $botUser->platform, $botUser->phone_number, $botUser->full_name, $botUser->email, $botUser->isBanned(), $botUser->isTrusted()),
+            'text' => $this->createContactMessage($botUser->chat_id, $botUser->platform, $botUser->phone_number, $botUser->full_name, $botUser->email, $botUser->isBanned(), $botUser->isTrusted(), $botUser->offer_accepted_at),
             'parse_mode' => 'html',
             'reply_markup' => [
                 'inline_keyboard' => $this->getKeyboard($botUser),
@@ -54,7 +54,7 @@ class SendContactMessage
      *
      * @return string
      */
-    public function createContactMessage(int $chatId, string $platform, ?string $phoneNumber = null, ?string $fullName = null, ?string $email = null, bool $isBanned = false, bool $isTrusted = false): string
+    public function createContactMessage(int $chatId, string $platform, ?string $phoneNumber = null, ?string $fullName = null, ?string $email = null, bool $isBanned = false, bool $isTrusted = false, ?\DateTimeInterface $offerAcceptedAt = null): string
     {
         try {
             $textMessage = '';
@@ -67,6 +67,16 @@ class SendContactMessage
             $textMessage .= $isTrusted
                 ? "✅ Доверенный (есть доступ к кодам и орг. информации) \n\n"
                 : "◻️ Не доверенный (нет доступа к кодам и орг. информации) \n\n";
+
+            // Договор-оферту принимают только сотрудники из Telegram
+            if ($platform === 'telegram') {
+                if ($offerAcceptedAt !== null) {
+                    $acceptedAt = \Carbon\Carbon::instance($offerAcceptedAt)->setTimezone('Europe/Minsk')->format('d.m.Y H:i');
+                    $textMessage .= "📄 Оферта принята: {$acceptedAt} \n\n";
+                } else {
+                    $textMessage .= "⏳ Оферта не принята \n\n";
+                }
+            }
 
             $textMessage .= "<b>КОНТАКТНАЯ ИНФОРМАЦИЯ</b> \n";
             $textMessage .= "Источник: {$platform} \n";

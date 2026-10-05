@@ -87,8 +87,9 @@ class TopicCreateJob implements ShouldQueue
                 // Это должно быть сделано до обновления названия, чтобы иконка не менялась
                 (new \App\Actions\Telegram\UpdateContactMessage())->execute($this->botUser);
 
-                // Отправляем и закрепляем в личном чате сообщение с кнопками доступа к кодам
-                (new \App\Actions\Telegram\SendAccessMessage())->execute($this->botUser);
+                // Отправляем договор-оферту; меню материалов с кнопками доступа
+                // отправляется и закрепляется после того, как сотрудник примет условия
+                (new \App\Actions\Telegram\SendOfferMessage())->execute($this->botUser);
 
                 // Обновляем название топика с учетом данных регистрации (full_name, email)
                 // Это особенно важно, если топик создается после завершения регистрации

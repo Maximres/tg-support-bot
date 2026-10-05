@@ -8,8 +8,8 @@ use App\Jobs\SendAccessMessageWithCallbackJob;
 use App\Models\BotUser;
 
 /**
- * Одноразовая отправка и закрепление в личном чате сотрудника сообщения
- * с кнопками доступа к кодам и орг. информации
+ * Одноразовая отправка и закрепление в личном чате сотрудника меню материалов:
+ * ссылки на инструкции, коды доступа, орг. информацию и договор
  */
 class SendAccessMessage
 {
@@ -30,10 +30,14 @@ class SendAccessMessage
             return;
         }
 
+        $phone = config('rental.emergency_phone');
+
         $queryParams = TGTextMessageDto::from([
             'methodQuery' => 'sendMessage',
             'chat_id' => $botUser->chat_id,
-            'text' => __('messages.access_message_text'),
+            'text' => __('messages.access_message_text', [
+                'phone_line' => $phone ? __('messages.access_phone_line', ['phone' => $phone]) : '',
+            ]),
             'parse_mode' => 'html',
             'reply_markup' => [
                 'inline_keyboard' => $this->getKeyboard(),
@@ -44,20 +48,51 @@ class SendAccessMessage
     }
 
     /**
+     * Кнопки меню. Ссылочные пункты без заданного в конфиге URL пропускаются.
+     * Первая кнопка (общая страница инструкций) — на всю ширину, остальные — по две в ряд.
+     *
      * @return array
      */
     public function getKeyboard(): array
     {
-        return [
-            [
-                ['text' => SafeCodeType::SAFE->buttonLabel(), 'callback_data' => SafeCodeType::SAFE->callbackData()],
-            ],
-            [
-                ['text' => SafeCodeType::BUILDING->buttonLabel(), 'callback_data' => SafeCodeType::BUILDING->callbackData()],
-            ],
-            [
-                ['text' => SafeCodeType::ORG_LINK->buttonLabel(), 'callback_data' => SafeCodeType::ORG_LINK->callbackData()],
-            ],
+        $links = config('rental.links', []);
+
+        $buttons = [];
+
+        foreach (['cabinets', 'map', 'schedule', 'payment', 'wifi'] as $key) {
+            if (!empty($links[$key])) {
+                $buttons[] = ['text' => __("messages.but_menu_{$key}"), 'url' => $links[$key]];
+            }
+        }
+
+        $buttons[] = [
+            'text' => SafeCodeType::ORG_LINK->buttonLabel(),
+            'callback_data' => SafeCodeType::ORG_LINK->callbackData(),
         ];
+
+        if (!empty($links['keys'])) {
+            $buttons[] = ['text' => __('messages.but_menu_keys'), 'callback_data' => 'access_show_keys'];
+        }
+
+        $buttons[] = [
+            'text' => SafeCodeType::SAFE->buttonLabel(),
+            'callback_data' => SafeCodeType::SAFE->callbackData(),
+        ];
+        $buttons[] = [
+            'text' => SafeCodeType::BUILDING->buttonLabel(),
+            'callback_data' => SafeCodeType::BUILDING->callbackData(),
+        ];
+
+        if (!empty(config('rental.offer_document'))) {
+            $buttons[] = ['text' => __('messages.but_menu_offer'), 'callback_data' => 'offer_show'];
+        }
+
+        $keyboard = [];
+
+        if (!empty($links['hub'])) {
+            $keyboard[] = [['text' => __('messages.but_menu_hub'), 'url' => $links['hub']]];
+        }
+
+        return array_merge($keyboard, array_chunk($buttons, 2));
     }
 }

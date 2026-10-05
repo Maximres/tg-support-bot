@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Ai\EditAiMessage;
+use App\Actions\Telegram\AcceptOffer;
 use App\Actions\Telegram\BannedContactMessage;
 use App\Actions\Telegram\CloseTopic;
 use App\Actions\Telegram\EditUserData;
@@ -13,7 +14,9 @@ use App\Actions\Telegram\SendAiAnswerMessage;
 use App\Actions\Telegram\SendBannedMessage;
 use App\Actions\Telegram\SendContactMessage;
 use App\Actions\Telegram\SendAccessMessage;
+use App\Actions\Telegram\SendOfferMessage;
 use App\Actions\Telegram\SendPhoneRequestMessage;
+use App\Actions\Telegram\ShowRentalMaterial;
 use App\Actions\Telegram\SendSafeCode;
 use App\Actions\Telegram\SendStartMessage;
 use App\Actions\Telegram\SetTrustedValue;
@@ -198,6 +201,18 @@ class TelegramBotController
                 if ($this->botUser && $this->dataHook->typeSource === 'private') {
                     (new EditUserData())->cancel($this->dataHook, $this->botUser);
                 }
+            } elseif ($this->dataHook->callbackData === 'offer_accept') {
+                if ($this->botUser && $this->dataHook->typeSource === 'private') {
+                    (new AcceptOffer())->execute($this->dataHook, $this->botUser);
+                }
+            } elseif ($this->dataHook->callbackData === 'offer_show') {
+                if ($this->botUser && $this->dataHook->typeSource === 'private') {
+                    (new ShowRentalMaterial())->showOffer($this->dataHook, $this->botUser);
+                }
+            } elseif ($this->dataHook->callbackData === 'access_show_keys') {
+                if ($this->botUser && $this->dataHook->typeSource === 'private') {
+                    (new ShowRentalMaterial())->showKeys($this->dataHook, $this->botUser);
+                }
             } elseif (str_contains($this->dataHook->callbackData, 'access_show_')) {
                 if ($this->botUser && $this->dataHook->typeSource === 'private') {
                     $type = SafeCodeType::tryFrom(str_replace('access_show_', '', $this->dataHook->callbackData));
@@ -373,8 +388,13 @@ class TelegramBotController
                         (new SendSafeCode())->execute($this->botUser, SafeCodeType::ORG_LINK);
                     } elseif ($this->isCommand('/restore_access', $this->dataHook->text) && !$this->isSupergroup()) {
                         // На случай, если сотрудник случайно удалил закреплённое сообщение
-                        // с кнопками доступа к кодам — пересылаем его заново
-                        (new SendAccessMessage())->execute($this->botUser, true);
+                        // с кнопками доступа к кодам — пересылаем его заново.
+                        // Если договор-оферта ещё не принят, сначала показываем его.
+                        if ($this->botUser->hasAcceptedOffer()) {
+                            (new SendAccessMessage())->execute($this->botUser, true);
+                        } else {
+                            (new SendOfferMessage())->execute($this->botUser);
+                        }
                     } elseif ($this->dataHook->text && str_contains($this->dataHook->text, '/ai_generate') && $this->isSupergroup()) {
                         (new SendAiAnswerMessage())->execute($this->dataHook);
                     } elseif ($this->isCommand('/rename_topic', $this->dataHook->text) && $this->isSupergroup()) {

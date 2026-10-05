@@ -20,7 +20,7 @@ class TelegramBackfillAccessMessages extends Command
      *
      * @var string
      */
-    protected $description = 'Отправляет и закрепляет сообщение с кнопками доступа к кодам сотрудникам, у которых его ещё нет';
+    protected $description = 'Отправляет и закрепляет меню материалов принявшим договор-оферту сотрудникам, у которых его ещё нет';
 
     /**
      * Execute the console command.
@@ -38,6 +38,7 @@ class TelegramBackfillAccessMessages extends Command
             ->where('is_banned', false)
             ->whereNotNull('chat_id')
             ->whereNotNull('topic_id')
+            ->whereNotNull('offer_accepted_at') // меню отправляется только после принятия договора-оферты
             ->whereNull('access_message_id')
             ->chunkById(20, function ($botUsers) use ($sendAccessMessage, $dryRun, &$total) {
                 foreach ($botUsers as $botUser) {
