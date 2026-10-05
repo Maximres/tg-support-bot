@@ -106,6 +106,26 @@ class SetBotCommands
                 'command' => 'set_org_link',
                 'description' => __('messages.command_set_org_link_description'),
             ],
+            [
+                'command' => 'backup_on',
+                'description' => __('messages.command_backup_on_description'),
+            ],
+            [
+                'command' => 'backup_off',
+                'description' => __('messages.command_backup_off_description'),
+            ],
+            [
+                'command' => 'backup_time',
+                'description' => __('messages.command_backup_time_description'),
+            ],
+            [
+                'command' => 'backup_now',
+                'description' => __('messages.command_backup_now_description'),
+            ],
+            [
+                'command' => 'backup_status',
+                'description' => __('messages.command_backup_status_description'),
+            ],
         ];
 
         $params = [

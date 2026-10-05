@@ -124,6 +124,29 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  scheduler:
+    build: .
+    container_name: laravel_scheduler
+    restart: always
+    command: php artisan schedule:work
+    depends_on:
+      app:
+        condition: service_healthy
+      pgdb:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - .:/var/www
+    networks:
+      - pet
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 volumes:
   pgdata:
 

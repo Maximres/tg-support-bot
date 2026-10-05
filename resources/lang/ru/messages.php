@@ -84,6 +84,31 @@ return [
 
 Пример: <code>/rename_topic Важное обращение</code>",
 
+    // Бэкап БД
+    'command_backup_on_description' => 'Включить ежедневный бэкап БД',
+    'command_backup_off_description' => 'Выключить ежедневный бэкап БД',
+    'command_backup_time_description' => 'Время бэкапа (использование: /backup_time 03:30)',
+    'command_backup_now_description' => 'Сделать бэкап БД сейчас',
+    'command_backup_status_description' => 'Состояние бэкапа БД',
+    'backup' => [
+        'on' => '✅ Ежедневный бэкап включён. Время запуска: :time (:tz).',
+        'off' => '⏸ Ежедневный бэкап выключен.',
+        'time_set' => '✅ Время бэкапа: :time (:tz).',
+        'time_invalid' => "⚠️ Укажите время в формате ЧЧ:ММ, например: <code>/backup_time 03:30</code>",
+        'not_configured' => '⚠️ Бэкап не настроен: на сервере не заданы BACKUP_TELEGRAM_CHAT_ID и BACKUP_PASSPHRASE.',
+        'running' => '⏳ Делаю бэкап…',
+        'done' => '✅ Бэкап готов и отправлен в чат бэкапов (:size КБ).',
+        'failed' => '❌ Бэкап не удался: :error',
+        'caption' => '🗄 Бэкап БД, :stamp UTC (:size КБ), зашифрован',
+        'state_on' => 'включён',
+        'state_off' => 'выключен',
+        'status_state' => '🗄 Бэкап: :state, ежедневно в :time (:tz)',
+        'status_never' => 'Ещё ни разу не запускался.',
+        'status_last_ok' => 'Последний: :at — ✅ успешно (:size КБ)',
+        'status_last_failed' => 'Последний: :at — ❌ ошибка: :error',
+        'status_local' => 'Локальных копий на сервере: :count',
+    ],
+
     // Установка кодов/ссылки администратором
     'command_admin_only' => '⛔ Эта команда доступна только администраторам группы.',
     'command_admin_check_failed' => '⚠️ Не удалось проверить права администратора, попробуйте ещё раз.',

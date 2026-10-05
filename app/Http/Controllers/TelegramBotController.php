@@ -7,6 +7,7 @@ use App\Actions\Telegram\AcceptOffer;
 use App\Actions\Telegram\BannedContactMessage;
 use App\Actions\Telegram\CloseTopic;
 use App\Actions\Telegram\EditUserData;
+use App\Actions\Telegram\HandleBackupCommand;
 use App\Actions\Telegram\RenameTopic;
 use App\Actions\Telegram\RequestPhoneFromGroup;
 use App\Actions\Telegram\RestoreTopicName;
@@ -103,7 +104,7 @@ class TelegramBotController
      */
     private function isGlobalAdminCommand(?string $text): bool
     {
-        foreach (['/set_code', '/set_building_code', '/set_org_link'] as $command) {
+        foreach (array_merge(['/set_code', '/set_building_code', '/set_org_link'], HandleBackupCommand::COMMANDS) as $command) {
             if ($this->isCommand($command, $text)) {
                 return true;
             }
@@ -317,6 +318,14 @@ class TelegramBotController
                 } elseif ($this->isCommand('/set_org_link', $this->dataHook->text) && $this->isSupergroup()) {
                     (new SetTrustedValue())->execute($this->dataHook, SafeCodeType::ORG_LINK);
                     die();
+                }
+
+                // Управление бэкапом БД — глобальные команды администраторов
+                foreach (HandleBackupCommand::COMMANDS as $backupCommand) {
+                    if ($this->isCommand($backupCommand, $this->dataHook->text)) {
+                        (new HandleBackupCommand())->execute($this->dataHook, $backupCommand);
+                        die();
+                    }
                 }
             }
 
