@@ -50,6 +50,9 @@ class CloseTopic
             ]))->delay(now()->addSeconds(1));
         }
 
+        // Запоминаем, что обращение закрыто: если клиент напишет снова, топик откроется автоматически
+        $botUser->markTopicClosed();
+
         // Закрытие топика выполняется после обновления иконки
         SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from([
             'methodQuery' => 'closeForumTopic',

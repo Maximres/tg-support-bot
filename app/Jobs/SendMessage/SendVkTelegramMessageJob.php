@@ -50,6 +50,8 @@ class SendVkTelegramMessageJob extends AbstractSendMessageJob
             $params = $this->queryParams->toArray();
 
             if ($botUser->topic_id) {
+                $this->reopenTopicIfClosed($botUser);
+
                 // Проверяем, существует ли топик перед отправкой
                 if (!\App\Actions\Telegram\CheckTopicExists::execute((int)$botUser->topic_id)) {
                     Log::warning('Топик не существует, очищаем topic_id и создаем новый', [

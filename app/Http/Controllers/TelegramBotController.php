@@ -9,6 +9,7 @@ use App\Actions\Telegram\CloseTopic;
 use App\Actions\Telegram\EditUserData;
 use App\Actions\Telegram\HandleBackupCommand;
 use App\Actions\Telegram\RenameTopic;
+use App\Actions\Telegram\ReopenTopic;
 use App\Actions\Telegram\RequestPhoneFromGroup;
 use App\Actions\Telegram\RestoreTopicName;
 use App\Actions\Telegram\SendAiAnswerMessage;
@@ -273,6 +274,15 @@ class TelegramBotController
             }
         }
         
+        // Служебные сообщения Telegram о закрытии/открытии темы (в том числе вручную в приложении):
+        // синхронизируем флаг, чтобы бот знал, что тему нужно открыть, когда клиент напишет
+        if (($this->dataHook->topicClosedStatus || $this->dataHook->topicReopenedStatus) && $this->dataHook->typeSource === 'supergroup') {
+            if ($this->botUser) {
+                $this->dataHook->topicClosedStatus ? $this->botUser->markTopicClosed() : $this->botUser->markTopicOpen();
+            }
+            return;
+        }
+
         if ($this->dataHook->editedTopicStatus && $this->dataHook->typeSource === 'supergroup') {
             // Сохраняем кастомное название топика при ручном редактировании пользователем
             // НЕ сохраняем, если это сообщение от бота (бот сам обновил название через RestoreTopicName или RenameTopic)
@@ -303,6 +313,9 @@ class TelegramBotController
             if ($this->dataHook->typeSource === 'supergroup') {
                 if ($this->isCommand('/contact', $this->dataHook->text) && $this->isSupergroup()) {
                     (new SendContactMessage())->execute($this->botUser);
+                    die();
+                } elseif ($this->isCommand('/reopen', $this->dataHook->text) && $this->isSupergroup() && $this->botUser) {
+                    (new ReopenTopic())->handleCommand($this->dataHook, $this->botUser);
                     die();
                 } elseif (($this->isCommand('/request_phone', $this->dataHook->text) || $this->isCommand('/get_phone', $this->dataHook->text)) && $this->isSupergroup() && $this->botUser) {
                     (new RequestPhoneFromGroup())->execute($this->botUser);

@@ -13,6 +13,8 @@ use Spatie\LaravelData\Data;
  * @property bool        $isBot
  * @property bool        $editedTopicStatus
  * @property bool        $pinnedMessageStatus
+ * @property bool        $topicClosedStatus
+ * @property bool        $topicReopenedStatus
  * @property string      $typeQuery
  * @property string      $typeSource
  * @property int|null    $chatId
@@ -40,6 +42,8 @@ class TelegramUpdateDto extends Data
         public bool    $isBot = false,
         public bool    $editedTopicStatus = false,
         public bool    $pinnedMessageStatus = false,
+        public bool    $topicClosedStatus = false,
+        public bool    $topicReopenedStatus = false,
         public ?int    $chatId = null,
         public ?int    $fromUserId = null,
         public ?array  $replyToMessage = null,
@@ -87,6 +91,8 @@ class TelegramUpdateDto extends Data
                 isBot: $data[$type]['from']['is_bot'],
                 editedTopicStatus: !empty($data['message']['forum_topic_edited']),
                 pinnedMessageStatus: !empty($data['message']['pinned_message']),
+                topicClosedStatus: isset($data['message']['forum_topic_closed']),
+                topicReopenedStatus: isset($data['message']['forum_topic_reopened']),
                 chatId: self::extractChatId($data, $type),
                 fromUserId: self::extractFromUserId($data, $type),
                 replyToMessage: self::extractReplayToMessage($data),

@@ -18,6 +18,7 @@ use phpDocumentor\Reflection\Exception;
  * @property int               $id
  * @property int|null          $sequential_number
  * @property int               $topic_id
+ * @property \Carbon\Carbon|null $topic_closed_at
  * @property int|null          $contact_info_message_id
  * @property int               $chat_id
  * @property string            $platform
@@ -44,6 +45,7 @@ class BotUser extends Model
     protected $fillable = [
         'chat_id',
         'topic_id',
+        'topic_closed_at',
         'contact_info_message_id',
         'platform',
         'phone_number',
@@ -63,6 +65,7 @@ class BotUser extends Model
 
     protected $casts = [
         'offer_accepted_at' => 'datetime',
+        'topic_closed_at' => 'datetime',
     ];
 
     /**
@@ -348,6 +351,34 @@ class BotUser extends Model
     public function hasAccessMessage(): bool
     {
         return !empty($this->access_message_id);
+    }
+
+    /**
+     * Закрыто ли обращение (топик в группе)
+     *
+     * @return bool
+     */
+    public function isTopicClosed(): bool
+    {
+        return !empty($this->topic_closed_at);
+    }
+
+    /**
+     * @return void
+     */
+    public function markTopicClosed(): void
+    {
+        $this->topic_closed_at = now();
+        $this->save();
+    }
+
+    /**
+     * @return void
+     */
+    public function markTopicOpen(): void
+    {
+        $this->topic_closed_at = null;
+        $this->save();
     }
 
     /**

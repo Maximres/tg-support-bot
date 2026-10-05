@@ -84,6 +84,13 @@ return [
 
 Пример: <code>/rename_topic Важное обращение</code>",
 
+    // Открытие закрытого обращения
+    'command_reopen_description' => 'Снова открыть закрытое обращение',
+    'topic_reopened' => '✅ Обращение снова открыто.',
+    'topic_already_open' => 'ℹ️ Обращение уже открыто.',
+    'topic_reopen_failed' => '⚠️ Не удалось открыть обращение. Откройте тему вручную в Telegram.',
+    'topic_reopened_by_client' => '🔄 Клиент написал в закрытое обращение — тема открыта снова.',
+
     // Бэкап БД
     'command_backup_on_description' => 'Включить ежедневный бэкап БД',
     'command_backup_off_description' => 'Выключить ежедневный бэкап БД',

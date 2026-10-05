@@ -3,6 +3,7 @@
 namespace App\Jobs\SendMessage;
 
 use App\Actions\Telegram\BanMessage;
+use App\Actions\Telegram\ReopenTopic;
 use App\DTOs\External\ExternalMessageDto;
 use App\DTOs\TelegramAnswerDto;
 use App\DTOs\TelegramUpdateDto;
@@ -138,6 +139,31 @@ abstract class AbstractSendMessageJob implements ShouldQueue
         }
     }
 
+    /**
+     * Если обращение закрыто, а клиент написал снова — открываем топик перед отправкой
+     * и оставляем сотрудникам пометку, почему тема снова открыта
+     *
+     * @param BotUser $botUser
+     *
+     * @return void
+     */
+    protected function reopenTopicIfClosed(BotUser $botUser): void
+    {
+        if (!$botUser->isTopicClosed() || empty($botUser->topic_id)) {
+            return;
+        }
+
+        if ((new ReopenTopic())->execute($botUser) === ReopenTopic::REOPENED) {
+            SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from([
+                'methodQuery' => 'sendMessage',
+                'chat_id' => config('traffic_source.settings.telegram.group_id'),
+                'message_thread_id' => $botUser->topic_id,
+                'text' => __('messages.topic_reopened_by_client'),
+                'parse_mode' => 'html',
+            ]));
+        }
+    }
+
     protected function telegramResponseHandler(TelegramAnswerDto $response): void
     {
         // ✅ 429 Too Many Requests
@@ -154,6 +180,16 @@ abstract class AbstractSendMessageJob implements ShouldQueue
             $this->queryParams->parse_mode = 'html';
             $this->release(1);
             return;
+        }
+
+        // ✅ 400 TOPIC_CLOSED — обращение закрыто (например, вручную в Telegram): открываем и повторяем
+        if ($response->response_code === 400 && $response->type_error === 'TOPIC_CLOSED') {
+            $botUser = BotUser::find($this->botUserId);
+
+            if ($botUser && (new ReopenTopic())->execute($botUser) !== ReopenTopic::FAILED) {
+                $this->release(1);
+                return;
+            }
         }
 
         // ✅ 400 TOPIC_NOT_FOUND или TOPIC_DELETED

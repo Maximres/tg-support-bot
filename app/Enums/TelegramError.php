@@ -12,6 +12,8 @@ enum TelegramError: string
     // Ошибки тем
     case TOPIC_NOT_FOUND = 'Bad Request: message thread not found';
     case TOPIC_DELETED = 'Bad Request: TOPIC_DELETED';
+    case TOPIC_CLOSED = 'Bad Request: TOPIC_CLOSED';
+    case TOPIC_NOT_MODIFIED = 'Bad Request: TOPIC_NOT_MODIFIED';
 
     // Ошибки чата
     case CHAT_NOT_FOUND = 'Bad Request: chat not found';

@@ -87,6 +87,10 @@ class SetBotCommands
                 'description' => __('messages.command_request_phone_description'),
             ],
             [
+                'command' => 'reopen',
+                'description' => __('messages.command_reopen_description'),
+            ],
+            [
                 'command' => 'rename_topic',
                 'description' => __('messages.command_rename_topic_description'),
             ],
