@@ -191,8 +191,15 @@ class RentalOnboardingTest extends TestCase
 
         (new ShowRentalMaterial())->showKeys($this->callbackDto($botUser, 'access_show_keys'), $botUser);
 
-        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'sendMessage')
-            && str_contains($r['reply_markup'] ?? '', 'https://example.com/keys'));
+        Http::assertSent(function (Request $r) {
+            if (!str_contains($r->url(), 'sendMessage')) {
+                return false;
+            }
+
+            $markup = json_decode($r['reply_markup'] ?? '[]', true);
+
+            return ($markup['inline_keyboard'][0][0]['url'] ?? null) === 'https://example.com/keys';
+        });
     }
 
     public function test_offer_can_be_shown_again(): void
