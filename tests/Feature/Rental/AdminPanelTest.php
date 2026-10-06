@@ -76,6 +76,14 @@ class AdminPanelTest extends TestCase
         ]));
     }
 
+    /** reply_markup как строка JSON: в теле запроса он может прийти и массивом, и строкой */
+    private function markup(Request $request): string
+    {
+        $markup = $request['reply_markup'] ?? '';
+
+        return is_array($markup) ? json_encode($markup, JSON_UNESCAPED_UNICODE) : (string)$markup;
+    }
+
     private function recorded(string $method): array
     {
         return array_values(array_filter(
@@ -96,7 +104,7 @@ class AdminPanelTest extends TestCase
     {
         (new AdminPanel())->handleCallback($this->callbackDto("panel:{$action}"));
 
-        $prompts = array_filter($this->recorded('sendMessage'), fn ($pair) => str_contains($pair[0]['reply_markup'] ?? '', 'force_reply'));
+        $prompts = array_filter($this->recorded('sendMessage'), fn ($pair) => str_contains($this->markup($pair[0]), 'force_reply'));
         $this->assertNotEmpty($prompts, 'бот не прислал подсказку для ввода');
 
         return (int)end($prompts)[1]->json('result.message_id');
@@ -108,7 +116,7 @@ class AdminPanelTest extends TestCase
 
         $sent = $this->recorded('sendMessage');
         $this->assertCount(1, $sent);
-        $keyboard = $sent[0][0]['reply_markup'];
+        $keyboard = $this->markup($sent[0][0]);
 
         foreach (['show_offer', 'set_offer', 'set_code', 'set_building_code', 'set_org_link', 'backup_status', 'backup_now', 'backup_on', 'backup_off', 'backup_time'] as $action) {
             $this->assertStringContainsString("panel:{$action}", $keyboard);
