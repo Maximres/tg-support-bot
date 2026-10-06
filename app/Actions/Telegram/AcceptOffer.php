@@ -59,7 +59,9 @@ class AcceptOffer
             'parse_mode' => 'html',
         ]));
 
-        (new SendAccessMessage())->execute($botUser);
+        // force: у сотрудников, зарегистрированных до появления оферты, уже есть закреплённое
+        // старое меню — заменяем его на актуальное (старый пин снимается)
+        (new SendAccessMessage())->execute($botUser, true);
 
         (new UpdateContactMessage())->execute($botUser);
     }
