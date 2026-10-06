@@ -15,6 +15,11 @@ class DataValidator
     private const MIN_FULL_NAME_LENGTH = 3;
 
     /**
+     * Минимальное число слов в ФИО (фамилия и имя)
+     */
+    private const MIN_FULL_NAME_WORDS = 2;
+
+    /**
      * Максимальная длина ФИО
      */
     private const MAX_FULL_NAME_LENGTH = 200;
@@ -56,6 +61,20 @@ class DataValidator
                 'error' => __('messages.registration.validation.full_name_too_short', [
                     'min' => self::MIN_FULL_NAME_LENGTH,
                 ]),
+                'normalized' => null,
+            ];
+        }
+
+        // ФИО — только буквы (допустимы пробел, дефис, апостроф, точка) и минимум два слова:
+        // «123», «Максим» и подобное не считаем полным ФИО
+        $words = preg_split('/\s+/u', $normalized, -1, PREG_SPLIT_NO_EMPTY);
+
+        if (preg_match('/[^\p{L}\s\-.\']/u', $normalized)
+            || !preg_match('/\p{L}/u', $normalized)
+            || count($words) < self::MIN_FULL_NAME_WORDS) {
+            return [
+                'valid' => false,
+                'error' => __('messages.registration.validation.full_name_invalid'),
                 'normalized' => null,
             ];
         }

@@ -3,6 +3,7 @@
 namespace App\TelegramBot;
 
 use App\Logging\LokiLogger;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -10,6 +11,19 @@ use phpDocumentor\Reflection\Exception as phpDocumentorException;
 
 class ParserMethods
 {
+    /**
+     * Скрывает токен бота в тексте ошибки: cURL подставляет в сообщение полный URL запроса,
+     * и токен попадал в логи
+     *
+     * @param string $message
+     *
+     * @return string
+     */
+    public static function maskBotToken(string $message): string
+    {
+        return preg_replace('~/bot\d+:[A-Za-z0-9_-]+/~', '/bot***/', $message) ?? $message;
+    }
+
     /**
      * Send POST
      *
@@ -22,8 +36,11 @@ class ParserMethods
     public static function postQuery(string $urlQuery, array|string $queryParams = [], array $queryHeading = []): array
     {
         try {
+            // Обрыв соединения с Telegram (cURL 35/56 и т.п.) чаще всего разовый — повторяем,
+            // иначе сообщение молча теряется (очередь синхронная, перезапускать некому)
             $resultQuery = Http::withHeaders($queryHeading)
-                ->when(config('traffic_source.telegram.force_ipv4'), fn ($client) => $client->withOptions(['force_ip_resolve' => 'v4']))
+                ->when(config('traffic_source.settings.telegram.force_ipv4'), fn ($client) => $client->withOptions(['force_ip_resolve' => 'v4']))
+                ->retry(2, 300, fn ($exception) => $exception instanceof ConnectionException, throw: false)
                 ->post($urlQuery, $queryParams)
                 ->json();
 
@@ -37,7 +54,7 @@ class ParserMethods
             return [
                 'ok' => false,
                 'response_code' => 500,
-                'result' => $e->getMessage(),
+                'result' => self::maskBotToken($e->getMessage()),
             ];
         }
     }
@@ -59,7 +76,7 @@ class ParserMethods
             }
 
             $resultQuery = Http::withHeaders($queryHeading)
-                ->when(config('traffic_source.telegram.force_ipv4'), fn ($client) => $client->withOptions(['force_ip_resolve' => 'v4']))
+                ->when(config('traffic_source.settings.telegram.force_ipv4'), fn ($client) => $client->withOptions(['force_ip_resolve' => 'v4']))
                 ->withoutVerifying()
                 ->get($urlQuery)
                 ->json();
@@ -74,7 +91,7 @@ class ParserMethods
             return [
                 'ok' => false,
                 'response_code' => 500,
-                'result' => $e->getMessage(),
+                'result' => self::maskBotToken($e->getMessage()),
             ];
         }
     }
@@ -125,7 +142,7 @@ class ParserMethods
                 fopen($tempPath, 'rb'),
                 $safeName
             )
-                ->when(config('traffic_source.telegram.force_ipv4'), fn ($client) => $client->withOptions(['force_ip_resolve' => 'v4']))
+                ->when(config('traffic_source.settings.telegram.force_ipv4'), fn ($client) => $client->withOptions(['force_ip_resolve' => 'v4']))
                 ->post($urlQuery, $queryParams)
                 ->json();
 
@@ -139,7 +156,7 @@ class ParserMethods
             return [
                 'ok' => false,
                 'response_code' => 500,
-                'result' => $e->getMessage(),
+                'result' => self::maskBotToken($e->getMessage()),
             ];
         }
     }

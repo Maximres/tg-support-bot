@@ -42,9 +42,18 @@ class SendStartMessage
             
             // Edge case: определение первого контакта
             // Если пользователь нуждается в регистрации и нет состояния в Redis
-            if ($botUser->needsRegistration() && !$this->registrationService->getState($update->chatId)) {
+            $state = $this->registrationService->getState($update->chatId);
+
+            if ($botUser->needsRegistration() && !$state) {
                 // Запуск процесса регистрации
                 $this->startRegistration($update, $botUser);
+                return;
+            }
+
+            // Регистрация уже идёт (клиент повторно нажал /start): не сбрасываем её и не показываем
+            // общее приветствие, а повторяем вопрос, на котором он остановился
+            if ($botUser->needsRegistration() && $this->registrationService->isValidState($state)) {
+                $this->sendFirstFieldRequest($update, $botUser, $state);
                 return;
             }
 
