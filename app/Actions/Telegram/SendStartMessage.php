@@ -82,9 +82,7 @@ class SendStartMessage
             $askedInWelcome = $initialState === UserRegistrationService::STATE_WAITING_FULL_NAME;
 
             if ($askedInWelcome) {
-                $welcomeText .= "
-
-" . __('messages.registration.ask_full_name');
+                $welcomeText .= "\n\n" . __('messages.registration.ask_full_name');
             }
 
             $messageParams = [
