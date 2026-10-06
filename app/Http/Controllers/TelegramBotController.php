@@ -53,8 +53,24 @@ class TelegramBotController
 
     public function __construct(Request $request)
     {
+        $startedAt = microtime(true);
+
         $dataHook = TelegramUpdateDto::fromRequest($request);
         $this->dataHook = !empty($dataHook) ? $dataHook : die();
+
+        // Обработка идёт синхронно, пока Telegram ждёт ответа: фиксируем медленные запросы,
+        // чтобы жалобы на задержки можно было сопоставить с логом (срабатывает и после die())
+        $updateId = $this->dataHook->updateId;
+        register_shutdown_function(function () use ($startedAt, $updateId) {
+            $seconds = microtime(true) - $startedAt;
+
+            if ($seconds > 3) {
+                Log::warning('TelegramBotController: медленная обработка webhook', [
+                    'update_id' => $updateId,
+                    'seconds' => round($seconds, 1),
+                ]);
+            }
+        });
 
         // Логируем входящий запрос для отладки broadcast
         if ($this->dataHook->typeQuery === 'message' && $this->dataHook->typeSource === 'supergroup') {
@@ -93,6 +109,14 @@ class TelegramBotController
         }
 
         if (empty($this->platform)) {
+            // Раньше такие сообщения пропадали без следа — оставляем запись, чтобы было видно, что и почему не доставлено
+            Log::info('TelegramBotController: сообщение пропущено — не найден пользователь для топика', [
+                'update_id' => $this->dataHook->updateId,
+                'type_source' => $this->dataHook->typeSource,
+                'message_thread_id' => $this->dataHook->messageThreadId,
+                'chat_id' => $this->dataHook->chatId,
+            ]);
+
             die();
         }
     }

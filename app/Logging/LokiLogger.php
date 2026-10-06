@@ -3,7 +3,9 @@
 namespace App\Logging;
 
 use Exception;
+use App\TelegramBot\ParserMethods;
 use GuzzleHttp\Client;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class LokiLogger
@@ -42,8 +44,13 @@ class LokiLogger
      */
     public function log(string $level, mixed $message): bool
     {
+        // Loki больше не используется, но этот класс вызывается из десятков мест, и раньше при
+        // пустом URL всё молча терялось — теперь всегда пишем в обычный лог приложения
+        $text = is_string($message) ? $message : json_encode($message, JSON_UNESCAPED_UNICODE);
+        Log::log($level, 'LokiLogger: ' . ParserMethods::maskBotToken((string)$text));
+
         try {
-            // Если URL не настроен, просто возвращаем true (не логируем)
+            // Если URL не настроен, во внешний сборщик не отправляем
             if (empty($this->url)) {
                 return true;
             }
@@ -87,13 +94,19 @@ class LokiLogger
      */
     public function logException(Throwable|Exception $e): bool
     {
+        $level = $e->getCode() === 1 ? 'warning' : 'error';
+
+        Log::log($level, 'LokiLogger: ' . ParserMethods::maskBotToken($e->getMessage()), [
+            'exception' => $e::class,
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
+        ]);
+
         try {
-            // Если URL не настроен, просто возвращаем true (не логируем)
+            // Если URL не настроен, во внешний сборщик не отправляем
             if (empty($this->url)) {
                 return true;
             }
-
-            $level = $e->getCode() === 1 ? 'warning' : 'error';
 
             $payload = [
                 'streams' => [
