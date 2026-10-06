@@ -91,6 +91,10 @@ class SetBotCommands
                 'description' => __('messages.command_reopen_description'),
             ],
             [
+                'command' => 'panel',
+                'description' => __('messages.command_panel_description'),
+            ],
+            [
                 'command' => 'set_offer',
                 'description' => __('messages.command_set_offer_description'),
             ],

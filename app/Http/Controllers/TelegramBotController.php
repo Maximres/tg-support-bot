@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\Ai\EditAiMessage;
 use App\Actions\Telegram\AcceptOffer;
+use App\Actions\Telegram\AdminPanel;
 use App\Actions\Telegram\BannedContactMessage;
 use App\Actions\Telegram\CloseTopic;
 use App\Actions\Telegram\EditUserData;
@@ -83,7 +84,7 @@ class TelegramBotController
             }
         }
 
-        if (empty($this->platform) && $this->dataHook->typeSource === 'supergroup' && $this->isGlobalAdminCommand($this->dataHook->text ?: $this->dataHook->caption)) {
+        if (empty($this->platform) && $this->dataHook->typeSource === 'supergroup' && ($this->isGlobalAdminCommand($this->dataHook->text ?: $this->dataHook->caption) || $this->isAdminPanelUpdate())) {
             // Глобальные команды администратора (/set_code и т.п.) не привязаны к топику
             // конкретного сотрудника, поэтому в General (или любом другом непривязанном
             // топике) обычное разрешение BotUser по topic_id ничего не найдёт — не убиваем
@@ -106,13 +107,24 @@ class TelegramBotController
      */
     private function isGlobalAdminCommand(?string $text): bool
     {
-        foreach (array_merge(['/set_code', '/set_building_code', '/set_org_link'], HandleBackupCommand::COMMANDS, HandleOfferDocumentCommand::COMMANDS) as $command) {
+        foreach (array_merge(['/set_code', '/set_building_code', '/set_org_link'], HandleBackupCommand::COMMANDS, HandleOfferDocumentCommand::COMMANDS, [AdminPanel::COMMAND]) as $command) {
             if ($this->isCommand($command, $text)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Нажатие кнопки панели администратора или ответ на её подсказку: к топику клиента не привязаны
+     *
+     * @return bool
+     */
+    private function isAdminPanelUpdate(): bool
+    {
+        return AdminPanel::isPanelCallback($this->dataHook->callbackData)
+            || ($this->dataHook->typeQuery === 'message' && AdminPanel::isPendingReply($this->dataHook));
     }
 
     /**
@@ -203,6 +215,10 @@ class TelegramBotController
             } elseif ($this->dataHook->callbackData === 'cancel_edit') {
                 if ($this->botUser && $this->dataHook->typeSource === 'private') {
                     (new EditUserData())->cancel($this->dataHook, $this->botUser);
+                }
+            } elseif (AdminPanel::isPanelCallback($this->dataHook->callbackData)) {
+                if ($this->dataHook->typeSource === 'supergroup') {
+                    (new AdminPanel())->handleCallback($this->dataHook);
                 }
             } elseif ($this->dataHook->callbackData === 'offer_accept') {
                 if ($this->botUser && $this->dataHook->typeSource === 'private') {
@@ -331,6 +347,17 @@ class TelegramBotController
                     die();
                 } elseif ($this->isCommand('/set_org_link', $this->dataHook->text) && $this->isSupergroup()) {
                     (new SetTrustedValue())->execute($this->dataHook, SafeCodeType::ORG_LINK);
+                    die();
+                }
+
+                // Панель администратора: команда /panel и значения, присланные в ответ на её подсказки
+                if ($this->isCommand(AdminPanel::COMMAND, $this->dataHook->text)) {
+                    (new AdminPanel())->send($this->dataHook);
+                    die();
+                }
+
+                if ($this->dataHook->typeQuery === 'message' && AdminPanel::isPendingReply($this->dataHook)) {
+                    (new AdminPanel())->handleReply($this->dataHook);
                     die();
                 }
 
