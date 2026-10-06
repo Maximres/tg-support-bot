@@ -76,11 +76,21 @@ class SendStartMessage
             // Устанавливаем состояние регистрации
             $this->registrationService->setState($update->chatId, $initialState);
             
-            // Отправляем приветственное сообщение
+            // Приветствие. Если регистрация начинается с ФИО, первый вопрос идёт в том же
+            // сообщении, а не отдельным — иначе клиент получает два сообщения подряд
+            $welcomeText = __('messages.registration.welcome');
+            $askedInWelcome = $initialState === UserRegistrationService::STATE_WAITING_FULL_NAME;
+
+            if ($askedInWelcome) {
+                $welcomeText .= "
+
+" . __('messages.registration.ask_full_name');
+            }
+
             $messageParams = [
                 'methodQuery' => 'sendMessage',
                 'chat_id' => $update->chatId,
-                'text' => __('messages.registration.welcome'),
+                'text' => $welcomeText,
                 'parse_mode' => 'html',
             ];
 
@@ -93,8 +103,10 @@ class SendStartMessage
                 'outgoing'
             );
 
-            // Отправляем запрос первого поля
-            $this->sendFirstFieldRequest($update, $botUser, $initialState);
+            // Запрос поля отдельным сообщением — только если он ещё не был в приветствии
+            if (!$askedInWelcome) {
+                $this->sendFirstFieldRequest($update, $botUser, $initialState);
+            }
         } catch (\Throwable $e) {
             Log::error('SendStartMessage: ошибка запуска регистрации', [
                 'chat_id' => $update->chatId,

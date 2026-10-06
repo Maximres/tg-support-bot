@@ -130,6 +130,11 @@ class TenantFlowTest extends TestCase
         $botUser = BotUser::where('chat_id', self::CHAT_ID)->firstOrFail();
         $flow = new HandleRegistrationFlow();
 
+        // На /start — одно сообщение: приветствие и первый вопрос (ФИО), без дубля
+        $this->assertSame(1, $this->sentCount('sendMessage', fn ($r) => str_contains($r['text'] ?? '', 'ФИО')));
+        $this->assertSame(1, $this->sentCount('sendMessage', fn ($r) => str_contains($r['text'] ?? '', 'Добрый день')
+            && str_contains($r['text'] ?? '', 'Напишите пожалуйста свои ФИО полностью')));
+
         $this->assertTrue($flow->execute($this->privateDto('Иванов Иван Иванович'), $botUser->fresh()));
         $this->assertTrue($flow->execute($this->privateDto('+375291234567'), $botUser->fresh()));
         $this->assertTrue($flow->execute($this->privateDto('ivanov@example.com'), $botUser->fresh()));
