@@ -57,7 +57,7 @@ class AdminPanelTest extends TestCase
         ]));
     }
 
-    private function callback(string $data): TelegramUpdateDto
+    private function callbackDto(string $data): TelegramUpdateDto
     {
         return TelegramUpdateDto::fromRequest(RequestFacade::create('api/telegram/bot', 'POST', [
             'update_id' => time(),
@@ -94,7 +94,7 @@ class AdminPanelTest extends TestCase
     /** Нажимает кнопку «с вводом» и возвращает id сообщения-подсказки */
     private function pressPromptButton(string $action): int
     {
-        (new AdminPanel())->handleCallback($this->callback("panel:{$action}"));
+        (new AdminPanel())->handleCallback($this->callbackDto("panel:{$action}"));
 
         $prompts = array_filter($this->recorded('sendMessage'), fn ($pair) => str_contains($pair[0]['reply_markup'] ?? '', 'force_reply'));
         $this->assertNotEmpty($prompts, 'бот не прислал подсказку для ввода');
@@ -143,7 +143,7 @@ class AdminPanelTest extends TestCase
     {
         $this->assertFalse(app(DatabaseBackupService::class)->isEnabled());
 
-        (new AdminPanel())->handleCallback($this->callback('panel:backup_on'));
+        (new AdminPanel())->handleCallback($this->callbackDto('panel:backup_on'));
 
         $this->assertTrue(app(DatabaseBackupService::class)->isEnabled());
         $this->assertStringContainsString('включён', $this->lastBotText());
@@ -154,7 +154,7 @@ class AdminPanelTest extends TestCase
     {
         $this->chatMemberStatus = 'member';
 
-        (new AdminPanel())->handleCallback($this->callback('panel:backup_on'));
+        (new AdminPanel())->handleCallback($this->callbackDto('panel:backup_on'));
 
         $this->assertFalse(app(DatabaseBackupService::class)->isEnabled());
         $alerts = $this->recorded('answerCallbackQuery');
