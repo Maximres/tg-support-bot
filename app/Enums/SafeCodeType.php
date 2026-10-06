@@ -76,8 +76,8 @@ enum SafeCodeType: string
     public function buttonLabel(): string
     {
         return match ($this) {
-            self::SAFE => '🔐 Показать код от сейфа',
-            self::BUILDING => '🔐 Показать код от здания',
+            self::SAFE => '🔐 Код сейфа',
+            self::BUILDING => '🔐 Код здания',
             self::ORG_LINK => 'ℹ️ Орг. информация',
         };
     }
