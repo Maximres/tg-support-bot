@@ -6,6 +6,7 @@ use App\DTOs\TelegramUpdateDto;
 use App\DTOs\TGTextMessageDto;
 use App\Jobs\SendTelegramSimpleQueryJob;
 use App\Models\BotUser;
+use App\Services\Rental\OfferDocument;
 
 /**
  * Пункты меню материалов, которые не сводятся к простой ссылке:
@@ -25,7 +26,7 @@ class ShowRentalMaterial
      */
     public function showOffer(TelegramUpdateDto $update, BotUser $botUser): void
     {
-        $document = config('rental.offer_document');
+        $document = OfferDocument::fileId();
 
         if ($botUser->isBanned()) {
             $this->ack($update->callbackId);

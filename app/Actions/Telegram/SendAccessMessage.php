@@ -6,6 +6,7 @@ use App\DTOs\TGTextMessageDto;
 use App\Enums\SafeCodeType;
 use App\Jobs\SendAccessMessageWithCallbackJob;
 use App\Models\BotUser;
+use App\Services\Rental\OfferDocument;
 
 /**
  * Одноразовая отправка и закрепление в личном чате сотрудника меню материалов:
@@ -83,7 +84,7 @@ class SendAccessMessage
             'callback_data' => SafeCodeType::BUILDING->callbackData(),
         ];
 
-        if (!empty(config('rental.offer_document'))) {
+        if (!empty(OfferDocument::fileId())) {
             $buttons[] = ['text' => __('messages.but_menu_offer'), 'callback_data' => 'offer_show'];
         }
 

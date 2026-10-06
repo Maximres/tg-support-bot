@@ -5,6 +5,7 @@ namespace App\Actions\Telegram;
 use App\DTOs\TGTextMessageDto;
 use App\Jobs\SendTelegramSimpleQueryJob;
 use App\Models\BotUser;
+use App\Services\Rental\OfferDocument;
 
 /**
  * Отправка сотруднику договора-оферты с кнопкой "Принимаю условия".
@@ -28,7 +29,7 @@ class SendOfferMessage
             return;
         }
 
-        $document = config('rental.offer_document');
+        $document = OfferDocument::fileId();
 
         $params = [
             'chat_id' => $botUser->chat_id,
