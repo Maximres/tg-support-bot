@@ -2,6 +2,7 @@
 
 namespace App\Actions\Telegram;
 
+use App\DTOs\TelegramUpdateDto;
 use App\TelegramBot\TelegramMethods;
 
 /**
@@ -20,6 +21,13 @@ class VerifyGroupAdmin
     {
         if (empty($userId)) {
             return false;
+        }
+
+        // Администратор, написавший анонимно: Telegram подписывает такое сообщение служебным
+        // «ботом» GroupAnonymousBot, подделать это от имени обычного пользователя нельзя,
+        // а узнать, кто именно из администраторов писал, нельзя — права подтверждены самим фактом
+        if ($userId === TelegramUpdateDto::ANONYMOUS_ADMIN_ID) {
+            return true;
         }
 
         $response = TelegramMethods::sendQueryTelegram('getChatMember', [

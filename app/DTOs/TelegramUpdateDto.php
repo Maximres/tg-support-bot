@@ -34,6 +34,13 @@ use Spatie\LaravelData\Data;
 */
 class TelegramUpdateDto extends Data
 {
+    /**
+     * Служебный «бот» Telegram, от имени которого приходят сообщения администраторов,
+     * писавших в группу анонимно (режим «Оставаться анонимным»). Сообщения от него
+     * формально is_bot=true, но на деле это администратор группы, а не бот
+     */
+    public const ANONYMOUS_ADMIN_ID = 1087968824;
+
     public function __construct(
         public int     $updateId,
         public string  $typeQuery,
@@ -88,7 +95,7 @@ class TelegramUpdateDto extends Data
                 typeQuery: $type,
                 aiTechMessage: $aiTechMessage,
                 typeSource: self::extractTypeSource($data, $type),
-                isBot: $data[$type]['from']['is_bot'],
+                isBot: $data[$type]['from']['is_bot'] && ($data[$type]['from']['id'] ?? null) !== self::ANONYMOUS_ADMIN_ID,
                 editedTopicStatus: !empty($data['message']['forum_topic_edited']),
                 pinnedMessageStatus: !empty($data['message']['pinned_message']),
                 topicClosedStatus: isset($data['message']['forum_topic_closed']),
