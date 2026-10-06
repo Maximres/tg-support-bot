@@ -344,6 +344,11 @@ class HandleRegistrationFlow
         // Обновляем модель из БД для получения актуальных данных
         $botUser->refresh();
 
+        // Завершение регистрации: подтверждение должно прийти раньше всего, что отправляется
+        // при создании топика (оферта и т.п.), иначе клиент увидит их в обратном порядке
+        $this->registrationService->clearState($update->chatId);
+        $this->sendCompletionMessage($update, $botUser);
+
         // Edge case: создаем топик после завершения регистрации, если его еще нет
         if (empty($botUser->topic_id)) {
             $this->createTopicAfterRegistration($botUser);
@@ -352,10 +357,6 @@ class HandleRegistrationFlow
             $this->updateTopicName($botUser);
             $this->updateContactMessage($botUser);
         }
-
-        // Завершение регистрации
-        $this->registrationService->clearState($update->chatId);
-        $this->sendCompletionMessage($update, $botUser);
 
         return true;
     }

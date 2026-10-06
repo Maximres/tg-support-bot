@@ -145,6 +145,17 @@ class TenantFlowTest extends TestCase
         $this->assertTrue($botUser->isRegistrationCompleted());
         $this->assertSame(self::TOPIC_ID, (int)$botUser->topic_id);
 
+        // 4a. Сначала подтверждение регистрации, и только потом оферта
+        $order = array_map(
+            fn ($pair) => basename(parse_url($pair[0]->url(), PHP_URL_PATH)) . '|' . ($pair[0]['text'] ?? $pair[0]['caption'] ?? ''),
+            Http::recorded()->all()
+        );
+        $completedAt = array_key_first(array_filter($order, fn ($row) => str_contains($row, 'Регистрация завершена')));
+        $offerAt = array_key_first(array_filter($order, fn ($row) => str_starts_with($row, 'sendDocument|')));
+        $this->assertNotNull($completedAt, 'нет сообщения о завершении регистрации');
+        $this->assertNotNull($offerAt, 'нет оферты');
+        $this->assertLessThan($offerAt, $completedAt, 'оферта пришла раньше подтверждения регистрации');
+
         // 5. Вместо меню приходит оферта; меню и закрепа пока нет
         $this->assertSame(1, $this->sentCount('sendDocument', fn ($r) => str_contains($r['reply_markup'] ?? '', 'offer_accept')));
         $this->assertSame(0, $this->sentCount('pinChatMessage'));
