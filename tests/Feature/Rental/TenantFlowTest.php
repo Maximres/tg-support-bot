@@ -108,7 +108,7 @@ class TenantFlowTest extends TestCase
     {
         return count(array_filter(
             Http::recorded()->all(),
-            fn ($pair) => str_contains($pair[0]->url(), $method) && ($filter === null || $filter($pair[0]))
+            fn ($pair) => basename(parse_url($pair[0]->url(), PHP_URL_PATH)) === $method && ($filter === null || $filter($pair[0]))
         ));
     }
 
@@ -160,7 +160,7 @@ class TenantFlowTest extends TestCase
         $this->assertTrue($botUser->hasAcceptedOffer());
         $this->assertNotNull($botUser->access_message_id);
         $this->assertSame(1, $this->sentCount('pinChatMessage'));
-        $this->assertSame(1, $this->sentCount('sendMessage', fn ($r) => str_contains($r['text'] ?? '', '+375291071837')));
+        $this->assertSame(1, $this->sentCount('sendMessage', fn ($r) => str_contains($r['text'] ?? '', 'Договор-оферта принят') && str_contains($r['text'] ?? '', '+375291071837')));
 
         // 8. Карточка обновилась
         $this->assertSame(1, $this->sentCount('editMessageText', fn ($r) => str_contains($r['text'] ?? '', 'Оферта принята')));
