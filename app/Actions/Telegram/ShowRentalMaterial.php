@@ -57,12 +57,40 @@ class ShowRentalMaterial
      */
     public function showKeys(TelegramUpdateDto $update, BotUser $botUser): void
     {
+        $this->showTrustedLink($update, $botUser, 'keys');
+    }
+
+    /**
+     * Отправить ссылку на график — только доверенным
+     *
+     * @param TelegramUpdateDto $update
+     * @param BotUser           $botUser
+     *
+     * @return void
+     */
+    public function showSchedule(TelegramUpdateDto $update, BotUser $botUser): void
+    {
+        $this->showTrustedLink($update, $botUser, 'schedule');
+    }
+
+    /**
+     * Ссылка из rental.links.{ключ}, которую видят только доверенные пользователи:
+     * в меню для неё нет url-кнопки, ссылка приходит отдельным сообщением по нажатию
+     *
+     * @param TelegramUpdateDto $update
+     * @param BotUser           $botUser
+     * @param string            $key
+     *
+     * @return void
+     */
+    private function showTrustedLink(TelegramUpdateDto $update, BotUser $botUser, string $key): void
+    {
         if ($botUser->isBanned() || !$botUser->isTrusted()) {
             $this->ack($update->callbackId, __('messages.access_not_trusted'), true);
             return;
         }
 
-        $link = config('rental.links.keys');
+        $link = config("rental.links.{$key}");
 
         if (empty($link)) {
             $this->ack($update->callbackId, __('messages.access_link_not_set'), true);
@@ -74,7 +102,7 @@ class ShowRentalMaterial
         SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from([
             'methodQuery' => 'sendMessage',
             'chat_id' => $botUser->chat_id,
-            'text' => __('messages.access_keys_message'),
+            'text' => __("messages.access_{$key}_message"),
             'parse_mode' => 'html',
             'reply_markup' => [
                 'inline_keyboard' => [

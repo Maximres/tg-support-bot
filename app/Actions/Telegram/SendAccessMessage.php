@@ -60,10 +60,15 @@ class SendAccessMessage
 
         $buttons = [];
 
+        // График и ключи — только для доверенных: у них нет url-кнопки, ссылка выдаётся по нажатию
         foreach (['cabinets', 'map', 'schedule', 'payment', 'wifi'] as $key) {
-            if (!empty($links[$key])) {
-                $buttons[] = ['text' => __("messages.but_menu_{$key}"), 'url' => $links[$key]];
+            if (empty($links[$key])) {
+                continue;
             }
+
+            $buttons[] = $key === 'schedule'
+                ? ['text' => __('messages.but_menu_schedule'), 'callback_data' => 'access_show_schedule']
+                : ['text' => __("messages.but_menu_{$key}"), 'url' => $links[$key]];
         }
 
         $buttons[] = [

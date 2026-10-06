@@ -252,6 +252,10 @@ class TelegramBotController
                 if ($this->botUser && $this->dataHook->typeSource === 'private') {
                     (new ShowRentalMaterial())->showOffer($this->dataHook, $this->botUser);
                 }
+            } elseif ($this->dataHook->callbackData === 'access_show_schedule') {
+                if ($this->botUser && $this->dataHook->typeSource === 'private') {
+                    (new ShowRentalMaterial())->showSchedule($this->dataHook, $this->botUser);
+                }
             } elseif ($this->dataHook->callbackData === 'access_show_keys') {
                 if ($this->botUser && $this->dataHook->typeSource === 'private') {
                     (new ShowRentalMaterial())->showKeys($this->dataHook, $this->botUser);

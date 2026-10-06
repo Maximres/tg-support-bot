@@ -172,6 +172,10 @@ class RentalOnboardingTest extends TestCase
         $this->assertStringNotContainsString('Как добраться', $flat);
         $this->assertStringNotContainsString('Оплата', $flat);
         $this->assertStringContainsString('access_show_keys', $flat);
+
+        // График, как и ключи, — только по нажатию доверенным: прямой ссылки в меню нет
+        $this->assertStringContainsString('access_show_schedule', $flat);
+        $this->assertStringNotContainsString('https://example.com/schedule', $flat);
         $this->assertStringNotContainsString('https://example.com/keys', $flat);
     }
 
@@ -199,6 +203,34 @@ class RentalOnboardingTest extends TestCase
             $markup = json_decode($r['reply_markup'] ?? '[]', true);
 
             return ($markup['inline_keyboard'][0][0]['url'] ?? null) === 'https://example.com/keys';
+        });
+    }
+
+    public function test_schedule_link_is_hidden_from_untrusted_user(): void
+    {
+        $botUser = $this->makeBotUser(['is_trusted' => false]);
+
+        (new ShowRentalMaterial())->showSchedule($this->callbackDto($botUser, 'access_show_schedule'), $botUser);
+
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'answerCallbackQuery') && $r['show_alert'] === true);
+        Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'sendMessage'));
+    }
+
+    public function test_schedule_link_is_sent_to_trusted_user(): void
+    {
+        $botUser = $this->makeBotUser(['is_trusted' => true]);
+
+        (new ShowRentalMaterial())->showSchedule($this->callbackDto($botUser, 'access_show_schedule'), $botUser);
+
+        Http::assertSent(function (Request $r) {
+            if (!str_contains($r->url(), 'sendMessage')) {
+                return false;
+            }
+
+            $markup = json_decode($r['reply_markup'] ?? '[]', true);
+
+            return ($markup['inline_keyboard'][0][0]['url'] ?? null) === 'https://example.com/schedule'
+                && str_contains($r['text'], 'График');
         });
     }
 
