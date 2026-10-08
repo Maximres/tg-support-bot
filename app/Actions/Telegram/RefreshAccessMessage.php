@@ -70,14 +70,16 @@ class RefreshAccessMessage
             'reply_markup' => ['inline_keyboard' => $menu->getKeyboard($botUser->hasMaterialsAccess())],
         ]);
 
+        $description = (string)($response->rawData['description'] ?? '');
+
         // Тот же текст и кнопки (например, повторное переключение) — Telegram отвечает ошибкой, но меню актуально
-        if ($response->ok === true || str_contains((string)($response->description ?? ''), 'message is not modified')) {
+        if ($response->ok === true || str_contains($description, 'message is not modified')) {
             return true;
         }
 
         Log::info('RefreshAccessMessage: не удалось обновить меню на месте', [
             'bot_user_id' => $botUser->id,
-            'error' => $response->description ?? null,
+            'error' => $description,
         ]);
 
         return false;

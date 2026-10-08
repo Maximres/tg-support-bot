@@ -172,6 +172,8 @@ class AdminPanelTest extends TestCase
 
     public function test_rotate_menu_lists_every_code_and_link_with_their_state(): void
     {
+        // Значения из .env окружения не влияют на проверку: «ключи» заведомо не заданы
+        config(['rental.links.keys' => null]);
         RentalLinks::set('schedule', 'https://example.com/schedule');
         SafeCode::create(['code' => '1111', 'type' => SafeCodeType::SAFE->value]);
 

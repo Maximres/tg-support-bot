@@ -109,7 +109,11 @@ class LinkRotationTest extends TestCase
     {
         $markup = $request['reply_markup'] ?? '';
 
-        return is_array($markup) ? json_encode($markup, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : (string)$markup;
+        if (is_string($markup)) {
+            $markup = json_decode($markup, true) ?? [];
+        }
+
+        return json_encode($markup, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 
     private function sentCount(string $method, ?callable $filter = null): int
