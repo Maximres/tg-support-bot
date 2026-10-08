@@ -344,6 +344,16 @@ class BotUser extends Model
     }
 
     /**
+     * Открыт ли доступ к материалам (ссылки, коды, орг. информация): доверенный и не заблокированный
+     *
+     * @return bool
+     */
+    public function hasMaterialsAccess(): bool
+    {
+        return $this->isTrusted() && !$this->isBanned();
+    }
+
+    /**
      * Проверяет, отправлено ли сотруднику закреплённое сообщение с кнопками доступа
      *
      * @return bool

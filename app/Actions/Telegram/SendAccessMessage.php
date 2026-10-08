@@ -7,10 +7,14 @@ use App\Enums\SafeCodeType;
 use App\Jobs\SendAccessMessageWithCallbackJob;
 use App\Models\BotUser;
 use App\Services\Rental\OfferDocument;
+use App\Services\Rental\RentalLinks;
 
 /**
- * Одноразовая отправка и закрепление в личном чате сотрудника меню материалов:
- * ссылки на инструкции, коды доступа, орг. информацию и договор
+ * Одноразовая отправка и закрепление в личном чате сотрудника меню материалов.
+ *
+ * Пока администратор не открыл доступ (и после его отзыва или блокировки) в меню только договор.
+ * С доступом — все материалы: ссылки, коды, орг. информация. Ссылки в сообщение не вшиваются:
+ * кнопки выдают актуальное значение при нажатии, поэтому ротация действует сразу.
  */
 class SendAccessMessage
 {
@@ -18,10 +22,11 @@ class SendAccessMessage
      * @param BotUser $botUser
      * @param bool    $force Отправить заново, даже если сообщение уже отправлялось ранее
      *                       (например, сотрудник случайно удалил закреплённое сообщение)
+     * @param string|null $intro Вступительная строка над текстом меню (например, благодарность за согласие с офертой)
      *
      * @return void
      */
-    public function execute(BotUser $botUser, bool $force = false): void
+    public function execute(BotUser $botUser, bool $force = false, ?string $intro = null): void
     {
         if ($botUser->platform !== 'telegram' || empty($botUser->chat_id)) {
             return;
@@ -31,17 +36,13 @@ class SendAccessMessage
             return;
         }
 
-        $phone = config('rental.emergency_phone');
-
         $queryParams = TGTextMessageDto::from([
             'methodQuery' => 'sendMessage',
             'chat_id' => $botUser->chat_id,
-            'text' => __('messages.access_message_text', [
-                'phone_line' => $phone ? __('messages.access_phone_line', ['phone' => $phone]) : '',
-            ]),
+            'text' => $this->buildText($botUser, $intro),
             'parse_mode' => 'html',
             'reply_markup' => [
-                'inline_keyboard' => $this->getKeyboard(),
+                'inline_keyboard' => $this->getKeyboard($botUser->hasMaterialsAccess()),
             ],
         ]);
 
@@ -49,54 +50,63 @@ class SendAccessMessage
     }
 
     /**
-     * Кнопки меню. Ссылочные пункты без заданного в конфиге URL пропускаются.
+     * Текст закреплённого сообщения для текущего состояния доступа
+     *
+     * @param BotUser     $botUser
+     * @param string|null $intro
+     *
+     * @return string
+     */
+    public function buildText(BotUser $botUser, ?string $intro = null): string
+    {
+        $phone = config('rental.emergency_phone');
+
+        $text = __($botUser->hasMaterialsAccess() ? 'messages.access_message_text' : 'messages.access_message_text_locked', [
+            'phone_line' => $phone ? __('messages.access_phone_line', ['phone' => $phone]) : '',
+        ]);
+
+        return $intro ? $intro . "\n\n" . $text : $text;
+    }
+
+    /**
+     * Кнопки меню. Без доступа — только договор; с доступом — всё остальное.
+     * Ссылочные пункты без заданного значения пропускаются.
      * Первая кнопка (общая страница инструкций) — на всю ширину, остальные — по две в ряд.
+     *
+     * @param bool $hasAccess
      *
      * @return array
      */
-    public function getKeyboard(): array
+    public function getKeyboard(bool $hasAccess = true): array
     {
-        $links = config('rental.links', []);
+        $offerButton = !empty(OfferDocument::fileId())
+            ? ['text' => __('messages.but_menu_offer'), 'callback_data' => 'offer_show']
+            : null;
+
+        if (!$hasAccess) {
+            return $offerButton ? [[$offerButton]] : [];
+        }
 
         $buttons = [];
 
-        // График и ключи — только для доверенных: у них нет url-кнопки, ссылка выдаётся по нажатию
-        foreach (['cabinets', 'map', 'schedule', 'payment', 'wifi'] as $key) {
-            if (empty($links[$key])) {
-                continue;
+        foreach (['cabinets', 'map', 'schedule', 'payment', 'wifi', 'keys'] as $key) {
+            if (!empty(RentalLinks::get($key))) {
+                $buttons[] = ['text' => __("messages.but_menu_{$key}"), 'callback_data' => "link_show_{$key}"];
             }
-
-            $buttons[] = $key === 'schedule'
-                ? ['text' => __('messages.but_menu_schedule'), 'callback_data' => 'access_show_schedule']
-                : ['text' => __("messages.but_menu_{$key}"), 'url' => $links[$key]];
         }
 
-        $buttons[] = [
-            'text' => SafeCodeType::ORG_LINK->buttonLabel(),
-            'callback_data' => SafeCodeType::ORG_LINK->callbackData(),
-        ];
-
-        if (!empty($links['keys'])) {
-            $buttons[] = ['text' => __('messages.but_menu_keys'), 'callback_data' => 'access_show_keys'];
+        foreach ([SafeCodeType::ORG_LINK, SafeCodeType::SAFE, SafeCodeType::BUILDING] as $type) {
+            $buttons[] = ['text' => $type->buttonLabel(), 'callback_data' => $type->callbackData()];
         }
 
-        $buttons[] = [
-            'text' => SafeCodeType::SAFE->buttonLabel(),
-            'callback_data' => SafeCodeType::SAFE->callbackData(),
-        ];
-        $buttons[] = [
-            'text' => SafeCodeType::BUILDING->buttonLabel(),
-            'callback_data' => SafeCodeType::BUILDING->callbackData(),
-        ];
-
-        if (!empty(OfferDocument::fileId())) {
-            $buttons[] = ['text' => __('messages.but_menu_offer'), 'callback_data' => 'offer_show'];
+        if ($offerButton) {
+            $buttons[] = $offerButton;
         }
 
         $keyboard = [];
 
-        if (!empty($links['hub'])) {
-            $keyboard[] = [['text' => __('messages.but_menu_hub'), 'url' => $links['hub']]];
+        if (!empty(RentalLinks::get('hub'))) {
+            $keyboard[] = [['text' => __('messages.but_menu_hub'), 'callback_data' => 'link_show_hub']];
         }
 
         return array_merge($keyboard, array_chunk($buttons, 2));

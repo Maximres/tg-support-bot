@@ -7,10 +7,11 @@ use App\DTOs\TGTextMessageDto;
 use App\Jobs\SendTelegramSimpleQueryJob;
 use App\Models\BotUser;
 use App\Services\Rental\OfferDocument;
+use App\Services\Rental\RentalLinks;
 
 /**
- * Пункты меню материалов, которые не сводятся к простой ссылке:
- * повторный показ договора и ссылка на ключи (только для доверенных)
+ * Пункты меню материалов, которые не сводятся к простому показу значения:
+ * повторный показ договора (всем) и ссылки на материалы (только при открытом доступе)
  */
 class ShowRentalMaterial
 {
@@ -48,7 +49,7 @@ class ShowRentalMaterial
     }
 
     /**
-     * Отправить ссылку на инструкцию по ключам — только доверенным
+     * Ссылка на ключи — для совместимости со старыми закреплёнными меню
      *
      * @param TelegramUpdateDto $update
      * @param BotUser           $botUser
@@ -57,11 +58,11 @@ class ShowRentalMaterial
      */
     public function showKeys(TelegramUpdateDto $update, BotUser $botUser): void
     {
-        $this->showTrustedLink($update, $botUser, 'keys');
+        $this->showLink($update, $botUser, 'keys');
     }
 
     /**
-     * Отправить ссылку на график — только доверенным
+     * Ссылка на график — для совместимости со старыми закреплёнными меню
      *
      * @param TelegramUpdateDto $update
      * @param BotUser           $botUser
@@ -70,12 +71,13 @@ class ShowRentalMaterial
      */
     public function showSchedule(TelegramUpdateDto $update, BotUser $botUser): void
     {
-        $this->showTrustedLink($update, $botUser, 'schedule');
+        $this->showLink($update, $botUser, 'schedule');
     }
 
     /**
-     * Ссылка из rental.links.{ключ}, которую видят только доверенные пользователи:
-     * в меню для неё нет url-кнопки, ссылка приходит отдельным сообщением по нажатию
+     * Актуальная ссылка из RentalLinks, только при открытом доступе. В закреплённом меню ссылок нет:
+     * бот при каждом нажатии берёт текущее значение, поэтому после ротации старая ссылка не работает
+     * ни из какого старого сообщения
      *
      * @param TelegramUpdateDto $update
      * @param BotUser           $botUser
@@ -83,14 +85,19 @@ class ShowRentalMaterial
      *
      * @return void
      */
-    private function showTrustedLink(TelegramUpdateDto $update, BotUser $botUser, string $key): void
+    public function showLink(TelegramUpdateDto $update, BotUser $botUser, string $key): void
     {
-        if ($botUser->isBanned() || !$botUser->isTrusted()) {
+        if (!in_array($key, RentalLinks::KEYS, true)) {
+            $this->ack($update->callbackId);
+            return;
+        }
+
+        if (!$botUser->hasMaterialsAccess()) {
             $this->ack($update->callbackId, __('messages.access_not_trusted'), true);
             return;
         }
 
-        $link = config("rental.links.{$key}");
+        $link = RentalLinks::get($key);
 
         if (empty($link)) {
             $this->ack($update->callbackId, __('messages.access_link_not_set'), true);
@@ -102,7 +109,7 @@ class ShowRentalMaterial
         SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from([
             'methodQuery' => 'sendMessage',
             'chat_id' => $botUser->chat_id,
-            'text' => __("messages.access_{$key}_message"),
+            'text' => __('messages.access_link_message', ['title' => RentalLinks::title($key)]),
             'parse_mode' => 'html',
             'reply_markup' => [
                 'inline_keyboard' => [

@@ -7,8 +7,10 @@ use App\Actions\Telegram\SetTrustedValue;
 use App\Actions\Telegram\ShowTrustedValue;
 use App\DTOs\TelegramUpdateDto;
 use App\Enums\SafeCodeType;
+use App\Models\BotSetting;
 use App\Models\BotUser;
 use App\Models\SafeCode;
+use App\Services\Rental\RotationNotifier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -144,7 +146,25 @@ class SafeCodeAccessFlowTest extends TestCase
         $this->assertSame('1234', SafeCode::current(SafeCodeType::SAFE)->code);
         $this->assertSame('5678', SafeCode::current(SafeCodeType::BUILDING)->code);
 
-        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'sendMessage') && ($r['chat_id'] ?? null) == $trusted->chat_id);
+        // Сразу ничего не уходит: изменения копятся и отправляются одним сообщением после паузы
+        Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'sendMessage') && ($r['chat_id'] ?? null) == $trusted->chat_id);
+
+        // Пауза без новых замен: сдвигаем метку последней замены в прошлое
+        BotSetting::set('rotation.last_at', (string)(time() - RotationNotifier::QUIET_SECONDS - 5));
+        (new RotationNotifier())->flushIfQuiet();
+
+        $summaries = array_filter(
+            Http::recorded()->all(),
+            fn ($pair) => str_contains($pair[0]->url(), 'sendMessage') && ($pair[0]['chat_id'] ?? null) == $trusted->chat_id
+        );
+        $this->assertCount(1, $summaries);
+
+        $text = array_values($summaries)[0][0]['text'];
+        $this->assertStringContainsString('Код от сейфа', $text);
+        $this->assertStringContainsString('Код от здания', $text);
+        $this->assertStringNotContainsString('1234', $text);
+        $this->assertStringNotContainsString('5678', $text);
+
         Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'sendMessage') && ($r['chat_id'] ?? null) == $untrusted->chat_id);
     }
 
@@ -223,8 +243,8 @@ class SafeCodeAccessFlowTest extends TestCase
     {
         $this->chatMemberStatus = 'administrator';
 
-        // Ссылка не требует доверия — сотрудник специально недоверенный
-        $botUser = $this->makeBotUser(['is_trusted' => false]);
+        // Орг. информация, как и остальные материалы, выдаётся только при открытом доступе
+        $botUser = $this->makeBotUser(['is_trusted' => true]);
 
         (new SetTrustedValue())->execute($this->groupCommandDto('/set_org_link https://old.example.com'), SafeCodeType::ORG_LINK);
 
@@ -241,6 +261,22 @@ class SafeCodeAccessFlowTest extends TestCase
 
         Http::assertSent(fn (Request $r) => str_contains($r->url(), 'sendMessage')
             && str_contains($r['reply_markup'] ?? '', 'new.example.com'));
+    }
+
+    public function test_org_link_is_not_given_to_untrusted_user(): void
+    {
+        $this->chatMemberStatus = 'administrator';
+        (new SetTrustedValue())->execute($this->groupCommandDto('/set_org_link https://old.example.com'), SafeCodeType::ORG_LINK);
+
+        $botUser = $this->makeBotUser(['is_trusted' => false]);
+        $dto = TelegramUpdate_SafeCodeButtonMock::getDto(
+            TelegramUpdate_SafeCodeButtonMock::getDtoParams($botUser->chat_id, SafeCodeType::ORG_LINK->callbackData())
+        );
+
+        (new ShowTrustedValue())->execute($dto, $botUser, SafeCodeType::ORG_LINK);
+
+        Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'sendMessage') && ($r['chat_id'] ?? null) == $botUser->chat_id);
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'answerCallbackQuery'));
     }
 
     public function test_unrecognized_callback_data_is_still_acknowledged(): void

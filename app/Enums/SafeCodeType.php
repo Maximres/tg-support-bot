@@ -16,7 +16,7 @@ enum SafeCodeType: string
      */
     public function requiresTrust(): bool
     {
-        return $this !== self::ORG_LINK;
+        return true;
     }
 
     /**

@@ -112,11 +112,21 @@ class TenantFlowTest extends TestCase
         ));
     }
 
+    private function markup(Request $request): string
+    {
+        $markup = $request['reply_markup'] ?? '';
+
+        return is_array($markup) ? json_encode($markup, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : (string)$markup;
+    }
+
+    /** Клавиатура последнего отправленного или отредактированного меню клиента */
     private function menuKeyboardJson(): string
     {
         foreach (array_reverse(Http::recorded()->all()) as [$request]) {
-            if (str_contains($request->url(), 'sendMessage') && str_contains($request['reply_markup'] ?? '', 'access_show_safe')) {
-                return $request['reply_markup'];
+            $isMenuCall = str_contains($request->url(), 'sendMessage') || str_contains($request->url(), 'editMessageText');
+
+            if ($isMenuCall && str_contains($this->markup($request), 'offer_show')) {
+                return $this->markup($request);
             }
         }
 
@@ -187,25 +197,46 @@ class TenantFlowTest extends TestCase
         $this->assertNotNull($botUser->access_message_id);
         $this->assertSame(1, $this->sentCount('pinChatMessage'));
         $this->assertSame(1, $this->sentCount('sendMessage', fn ($r) => str_contains($r['text'] ?? '', 'Договор-оферта принят') && str_contains($r['text'] ?? '', '+375291071837')));
+        $this->assertSame(1, $this->sentCount('sendMessage', fn ($r) => (int)($r['chat_id'] ?? 0) === self::CHAT_ID && !str_contains($r['text'] ?? '', 'Регистрация') && !str_contains($r['text'] ?? '', 'ФИО') && !str_contains($r['text'] ?? '', 'телефон') && !str_contains($r['text'] ?? '', 'email') && !str_contains($r['text'] ?? '', 'эмейл')));
 
         // 8. Карточка обновилась
         $this->assertSame(1, $this->sentCount('editMessageText', fn ($r) => str_contains($r['text'] ?? '', 'Оферта принята')));
 
-        // 9. Меню содержит ссылки и callback-кнопки (ключи — без прямой ссылки)
+        // 9. Пока доступ не открыт, в меню только договор: ни ссылок, ни кодов
         $menu = $this->menuKeyboardJson();
-        $this->assertStringContainsString('example.com\/hub', $menu);
-        $this->assertStringContainsString('example.com\/wifi', $menu);
-        $this->assertStringContainsString('access_show_keys', $menu);
-        $this->assertStringNotContainsString('example.com\/keys', $menu);
+        $this->assertStringContainsString('offer_show', $menu);
+        $this->assertStringNotContainsString('link_show_', $menu);
+        $this->assertStringNotContainsString('access_show_', $menu);
+        $this->assertStringNotContainsString('example.com', $menu);
 
-        // 10. Ключи до выдачи доступа не отдаются, после — отдаются
-        $sentBefore = $this->sentCount('sendMessage', fn ($r) => str_contains($r['reply_markup'] ?? '', 'example.com\/keys'));
-        (new ShowRentalMaterial())->showKeys($this->callbackDto('access_show_keys'), $botUser);
-        $this->assertSame($sentBefore, $this->sentCount('sendMessage', fn ($r) => str_contains($r['reply_markup'] ?? '', 'example.com\/keys')));
+        // 10. Ссылка до выдачи доступа не отдаётся
+        $linksSent = fn () => $this->sentCount('sendMessage', fn ($r) => str_contains($this->markup($r), 'example.com'));
+        $before = $linksSent();
+        (new ShowRentalMaterial())->showLink($this->callbackDto('link_show_keys'), $botUser, 'keys');
+        $this->assertSame($before, $linksSent());
 
+        // 10a. Админ открывает доступ: меню у клиента правится на месте и появляется уведомление
         (new TrustContactMessage())->execute($botUser, true);
-        (new ShowRentalMaterial())->showKeys($this->callbackDto('access_show_keys'), $botUser->fresh());
-        $this->assertSame($sentBefore + 1, $this->sentCount('sendMessage', fn ($r) => str_contains($r['reply_markup'] ?? '', 'example.com\/keys')));
+
+        $this->assertSame(1, $this->sentCount('editMessageText', fn ($r) => str_contains($this->markup($r), 'link_show_hub')));
+        $this->assertSame(1, $this->sentCount('sendMessage', fn ($r) => str_contains($r['text'] ?? '', 'открыт доступ')));
+        $menu = $this->menuKeyboardJson();
+        $this->assertStringContainsString('link_show_keys', $menu);
+        $this->assertStringNotContainsString('example.com', $menu);
+
+        // 10b. Теперь ссылка отдаётся
+        (new ShowRentalMaterial())->showLink($this->callbackDto('link_show_keys'), $botUser->fresh(), 'keys');
+        $this->assertSame($before + 1, $linksSent());
+
+        // 10c. Отзыв доступа: меню снова сворачивается, ссылка не отдаётся
+        (new TrustContactMessage())->execute($botUser->fresh(), false);
+        $this->assertStringNotContainsString('link_show_', $this->menuKeyboardJson());
+
+        $before = $linksSent();
+        (new ShowRentalMaterial())->showLink($this->callbackDto('link_show_keys'), $botUser->fresh(), 'keys');
+        $this->assertSame($before, $linksSent());
+
+        (new TrustContactMessage())->execute($botUser->fresh(), true);
 
         // 11. Обращение закрывают, клиент пишет снова -> тема открывается раньше сообщения
         (new CloseTopic())->execute($botUser->fresh());
@@ -256,6 +287,11 @@ class TenantFlowTest extends TestCase
         $this->assertNotSame(356, (int)$botUser->access_message_id);
         $this->assertSame(1, $this->sentCount('unpinChatMessage', fn ($r) => (int)$r['message_id'] === 356));
         $this->assertSame(1, $this->sentCount('pinChatMessage'));
-        $this->assertStringContainsString('example.com\/hub', $this->menuKeyboardJson());
+
+        // Старое сообщение удалено, а новое меню без доступа содержит только договор
+        $this->assertSame(1, $this->sentCount('deleteMessage', fn ($r) => (int)$r['message_id'] === 356));
+        $menu = $this->menuKeyboardJson();
+        $this->assertStringContainsString('offer_show', $menu);
+        $this->assertStringNotContainsString('link_show_', $menu);
     }
 }

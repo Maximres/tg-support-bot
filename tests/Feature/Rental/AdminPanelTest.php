@@ -6,6 +6,7 @@ use App\Actions\Telegram\AdminPanel;
 use App\DTOs\TelegramUpdateDto;
 use App\Enums\SafeCodeType;
 use App\Models\SafeCode;
+use App\Services\Rental\RentalLinks;
 use App\Services\Backup\DatabaseBackupService;
 use App\Services\Rental\OfferDocument;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -118,7 +119,7 @@ class AdminPanelTest extends TestCase
         $this->assertCount(1, $sent);
         $keyboard = $this->markup($sent[0][0]);
 
-        foreach (['show_offer', 'set_offer', 'set_code', 'set_building_code', 'set_org_link', 'backup_status', 'backup_now', 'backup_on', 'backup_off', 'backup_time'] as $action) {
+        foreach (['show_offer', 'set_offer', 'rotate', 'backup_status', 'backup_now', 'backup_on', 'backup_off', 'backup_time'] as $action) {
             $this->assertStringContainsString("panel:{$action}", $keyboard);
         }
 
@@ -167,6 +168,44 @@ class AdminPanelTest extends TestCase
         $this->assertFalse(app(DatabaseBackupService::class)->isEnabled());
         $alerts = $this->recorded('answerCallbackQuery');
         $this->assertTrue((bool)$alerts[0][0]['show_alert']);
+    }
+
+    public function test_rotate_menu_lists_every_code_and_link_with_their_state(): void
+    {
+        RentalLinks::set('schedule', 'https://example.com/schedule');
+        SafeCode::create(['code' => '1111', 'type' => SafeCodeType::SAFE->value]);
+
+        (new AdminPanel())->handleCallback($this->callbackDto('panel:rotate'));
+
+        $menu = array_values(array_filter($this->recorded('sendMessage'), fn ($pair) => str_contains($this->markup($pair[0]), 'panel:link_schedule')));
+        $this->assertCount(1, $menu);
+
+        $keyboard = $this->markup($menu[0][0]);
+        foreach (['set_code', 'set_building_code', 'set_org_link', 'link_hub', 'link_cabinets', 'link_map', 'link_schedule', 'link_payment', 'link_wifi', 'link_keys'] as $action) {
+            $this->assertStringContainsString("panel:{$action}", $keyboard);
+        }
+
+        // Задано — галочка, не задано — прочерк
+        $flat = json_decode($keyboard, true)['inline_keyboard'];
+        $labels = array_column(array_merge(...$flat), 'text', 'callback_data');
+        $this->assertStringContainsString('✅', $labels['panel:set_code']);
+        $this->assertStringContainsString('➖', $labels['panel:set_building_code']);
+        $this->assertStringContainsString('✅', $labels['panel:link_schedule']);
+        $this->assertStringContainsString('➖', $labels['panel:link_keys']);
+    }
+
+    public function test_link_button_asks_for_a_url_and_the_reply_rotates_it(): void
+    {
+        $promptId = $this->pressPromptButton('link_schedule');
+
+        $reply = $this->message(['text' => 'https://new.example.com/sheet', 'reply_to_message' => [
+            'message_id' => $promptId, 'from' => ['id' => 1, 'is_bot' => true, 'first_name' => 'Bot'],
+            'chat' => ['id' => self::GROUP_ID, 'type' => 'supergroup'], 'date' => time(), 'text' => 'p',
+        ]]);
+
+        (new AdminPanel())->handleReply($reply);
+
+        $this->assertSame('https://new.example.com/sheet', RentalLinks::get('schedule'));
     }
 
     public function test_code_button_asks_for_a_value_and_the_reply_sets_it(): void

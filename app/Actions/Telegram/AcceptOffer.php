@@ -3,14 +3,12 @@
 namespace App\Actions\Telegram;
 
 use App\DTOs\TelegramUpdateDto;
-use App\DTOs\TGTextMessageDto;
-use App\Jobs\SendTelegramSimpleQueryJob;
 use App\Models\BotUser;
 use App\TelegramBot\TelegramMethods;
 
 /**
- * Нажатие кнопки "Принимаю условия": фиксируем время согласия, убираем кнопку,
- * отправляем приветствие и закреплённое меню материалов, обновляем карточку в группе
+ * Нажатие кнопки "Принимаю условия": фиксируем время согласия, убираем кнопку и отправляем
+ * закреплённое меню одним сообщением (с благодарностью); карточка в группе обновляется
  */
 class AcceptOffer
 {
@@ -48,20 +46,9 @@ class AcceptOffer
             ]);
         }
 
-        $phone = config('rental.emergency_phone');
-
-        SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from([
-            'methodQuery' => 'sendMessage',
-            'chat_id' => $botUser->chat_id,
-            'text' => __('messages.offer_welcome_message', [
-                'phone_line' => $phone ? __('messages.offer_phone_line', ['phone' => $phone]) : '',
-            ]),
-            'parse_mode' => 'html',
-        ]));
-
-        // force: у сотрудников, зарегистрированных до появления оферты, уже есть закреплённое
-        // старое меню — заменяем его на актуальное (старый пин снимается)
-        (new SendAccessMessage())->execute($botUser, true);
+        // force: у сотрудников, зарегистрированных до появления оферты, уже может быть закреплено
+        // старое меню — заменяем его актуальным (старый пин снимается)
+        (new SendAccessMessage())->execute($botUser, true, __('messages.offer_accepted_intro'));
 
         (new UpdateContactMessage())->execute($botUser);
     }

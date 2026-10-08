@@ -8,6 +8,8 @@ use App\Enums\SafeCodeType;
 use App\Jobs\SendTelegramSimpleQueryJob;
 use App\Logging\LokiLogger;
 use App\Models\BotSetting;
+use App\Models\SafeCode;
+use App\Services\Rental\RentalLinks;
 use App\TelegramBot\TelegramMethods;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -25,6 +27,8 @@ class AdminPanel
     use AnswersCallbackQuery;
 
     public const COMMAND = '/panel';
+
+    public const ROTATE_CALLBACK = 'panel:rotate';
 
     private const CALLBACK_PREFIX = 'panel:';
 
@@ -148,6 +152,23 @@ class AdminPanel
 
             $action = substr((string)$update->callbackData, strlen(self::CALLBACK_PREFIX));
 
+            if ($action === 'rotate') {
+                $this->ack($update->callbackId);
+                $this->sendRotateMenu($update);
+                return;
+            }
+
+            if (str_starts_with($action, 'link_') && in_array(substr($action, 5), RentalLinks::KEYS, true)) {
+                $key = substr($action, 5);
+                $this->ack($update->callbackId);
+                $this->askForValue(
+                    $update,
+                    SetRentalLink::COMMAND . ' ' . $key,
+                    __('messages.panel.prompt_link', ['title' => RentalLinks::title($key)])
+                );
+                return;
+            }
+
             if (isset(self::DIRECT[$action])) {
                 $this->ack($update->callbackId);
                 $this->runCommand($this->syntheticMessage($update, self::DIRECT[$action]), self::DIRECT[$action]);
@@ -211,6 +232,11 @@ class AdminPanel
      */
     private function runCommand(TelegramUpdateDto $update, string $command): void
     {
+        if (str_starts_with($command, SetRentalLink::COMMAND)) {
+            (new SetRentalLink())->execute($update);
+            return;
+        }
+
         match ($command) {
             '/set_code' => (new SetTrustedValue())->execute($update, SafeCodeType::SAFE),
             '/set_building_code' => (new SetTrustedValue())->execute($update, SafeCodeType::BUILDING),
@@ -288,11 +314,45 @@ class AdminPanel
 
         return [
             [$button('show_offer'), $button('set_offer')],
-            [$button('set_code'), $button('set_building_code')],
-            [$button('set_org_link')],
+            [$button('rotate')],
             [$button('backup_status'), $button('backup_now')],
             [$button('backup_on'), $button('backup_off'), $button('backup_time')],
         ];
+    }
+
+    /**
+     * Меню ротации: все коды и ссылки, значения которых админ может заменить (✅ задано, ➖ не задано)
+     *
+     * @param TelegramUpdateDto $update
+     *
+     * @return void
+     */
+    private function sendRotateMenu(TelegramUpdateDto $update): void
+    {
+        $mark = fn (bool $isSet) => $isSet ? ' ✅' : ' ➖';
+        $buttons = [];
+
+        foreach ([['set_code', SafeCodeType::SAFE], ['set_building_code', SafeCodeType::BUILDING], ['set_org_link', SafeCodeType::ORG_LINK]] as [$action, $type]) {
+            $buttons[] = [
+                'text' => __("messages.panel.but_{$action}") . $mark(SafeCode::current($type) !== null),
+                'callback_data' => self::CALLBACK_PREFIX . $action,
+            ];
+        }
+
+        foreach (RentalLinks::KEYS as $key) {
+            $buttons[] = [
+                'text' => __("messages.panel.but_link_{$key}") . $mark(RentalLinks::get($key) !== null),
+                'callback_data' => self::CALLBACK_PREFIX . 'link_' . $key,
+            ];
+        }
+
+        TelegramMethods::sendQueryTelegram('sendMessage', array_filter([
+            'chat_id' => config('traffic_source.settings.telegram.group_id'),
+            'message_thread_id' => $update->messageThreadId,
+            'text' => __('messages.panel.rotate_text'),
+            'parse_mode' => 'html',
+            'reply_markup' => ['inline_keyboard' => array_chunk($buttons, 2)],
+        ], fn ($value) => $value !== null));
     }
 
     /**

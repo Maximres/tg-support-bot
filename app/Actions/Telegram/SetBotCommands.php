@@ -123,6 +123,10 @@ class SetBotCommands
                 'description' => __('messages.command_set_org_link_description'),
             ],
             [
+                'command' => 'set_link',
+                'description' => __('messages.command_set_link_description'),
+            ],
+            [
                 'command' => 'backup_on',
                 'description' => __('messages.command_backup_on_description'),
             ],

@@ -23,6 +23,7 @@ use App\Actions\Telegram\SendPhoneRequestMessage;
 use App\Actions\Telegram\ShowRentalMaterial;
 use App\Actions\Telegram\SendSafeCode;
 use App\Actions\Telegram\SendStartMessage;
+use App\Actions\Telegram\SetRentalLink;
 use App\Actions\Telegram\SetTrustedValue;
 use App\Actions\Telegram\ShowTrustedValue;
 use App\Actions\Telegram\ShowUserDataMenu;
@@ -131,7 +132,7 @@ class TelegramBotController
      */
     private function isGlobalAdminCommand(?string $text): bool
     {
-        foreach (array_merge(['/set_code', '/set_building_code', '/set_org_link'], HandleBackupCommand::COMMANDS, HandleOfferDocumentCommand::COMMANDS, [AdminPanel::COMMAND]) as $command) {
+        foreach (array_merge(['/set_code', '/set_building_code', '/set_org_link'], HandleBackupCommand::COMMANDS, HandleOfferDocumentCommand::COMMANDS, [AdminPanel::COMMAND, SetRentalLink::COMMAND]) as $command) {
             if ($this->isCommand($command, $text)) {
                 return true;
             }
@@ -251,6 +252,10 @@ class TelegramBotController
             } elseif ($this->dataHook->callbackData === 'offer_show') {
                 if ($this->botUser && $this->dataHook->typeSource === 'private') {
                     (new ShowRentalMaterial())->showOffer($this->dataHook, $this->botUser);
+                }
+            } elseif (str_starts_with((string)$this->dataHook->callbackData, 'link_show_')) {
+                if ($this->botUser && $this->dataHook->typeSource === 'private') {
+                    (new ShowRentalMaterial())->showLink($this->dataHook, $this->botUser, substr($this->dataHook->callbackData, strlen('link_show_')));
                 }
             } elseif ($this->dataHook->callbackData === 'access_show_schedule') {
                 if ($this->botUser && $this->dataHook->typeSource === 'private') {
@@ -375,6 +380,12 @@ class TelegramBotController
                     die();
                 } elseif ($this->isCommand('/set_org_link', $this->dataHook->text) && $this->isSupergroup()) {
                     (new SetTrustedValue())->execute($this->dataHook, SafeCodeType::ORG_LINK);
+                    die();
+                }
+
+                // Ротация ссылок меню: /set_link <название> <ссылка>
+                if ($this->isCommand(SetRentalLink::COMMAND, $this->dataHook->text)) {
+                    (new SetRentalLink())->execute($this->dataHook);
                     die();
                 }
 

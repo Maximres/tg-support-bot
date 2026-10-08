@@ -113,9 +113,20 @@ class RentalOnboardingTest extends TestCase
         $this->assertNotNull($botUser->access_message_id);
 
         Http::assertSent(fn (Request $r) => str_contains($r->url(), 'editMessageReplyMarkup'));
-        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'sendMessage')
-            && str_contains($r['text'] ?? '', '+375291234567'));
         Http::assertSent(fn (Request $r) => str_contains($r->url(), 'pinChatMessage'));
+
+        // Одно сообщение: благодарность, телефон и меню; отдельного приветствия нет
+        $menus = array_filter(
+            Http::recorded()->all(),
+            fn ($pair) => str_contains($pair[0]->url(), 'sendMessage') && str_contains($pair[0]['text'] ?? '', 'Договор-оферта принят')
+        );
+        $this->assertCount(1, $menus);
+        $this->assertStringContainsString('+375291234567', array_values($menus)[0][0]['text']);
+        $toClient = array_filter(
+            Http::recorded()->all(),
+            fn ($pair) => str_contains($pair[0]->url(), 'sendMessage') && (int)($pair[0]['chat_id'] ?? 0) === $botUser->chat_id
+        );
+        $this->assertCount(1, $toClient);
     }
 
     public function test_accepting_offer_twice_does_not_resend_menu(): void
@@ -152,31 +163,47 @@ class RentalOnboardingTest extends TestCase
         Http::assertSent(fn (Request $r) => str_contains($r->url(), 'pinChatMessage'));
     }
 
-    public function test_menu_contains_only_configured_links(): void
+    public function test_menu_without_access_contains_only_the_offer(): void
     {
-        $keyboard = (new SendAccessMessage())->getKeyboard();
+        $keyboard = (new SendAccessMessage())->getKeyboard(false);
+
+        $this->assertSame([[['text' => '📄 Договор', 'callback_data' => 'offer_show']]], $keyboard);
+    }
+
+    public function test_menu_without_access_and_without_offer_is_empty(): void
+    {
+        config(['rental.offer_document' => null]);
+
+        $this->assertSame([], (new SendAccessMessage())->getKeyboard(false));
+    }
+
+    public function test_menu_with_access_has_every_item_but_no_direct_links(): void
+    {
+        $keyboard = (new SendAccessMessage())->getKeyboard(true);
         $flat = json_encode($keyboard, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
         // Общая страница инструкций — отдельной строкой сверху
         $this->assertCount(1, $keyboard[0]);
-        $this->assertSame('https://example.com/hub', $keyboard[0][0]['url']);
+        $this->assertSame('link_show_hub', $keyboard[0][0]['callback_data']);
 
-        $this->assertStringContainsString('https://example.com/cabinets', $flat);
-        $this->assertStringContainsString('https://example.com/wifi', $flat);
-        $this->assertStringContainsString('access_show_safe', $flat);
-        $this->assertStringContainsString('access_show_building', $flat);
-        $this->assertStringContainsString('access_show_org_link', $flat);
-        $this->assertStringContainsString('offer_show', $flat);
+        foreach (['link_show_cabinets', 'link_show_wifi', 'link_show_schedule', 'link_show_keys', 'access_show_safe', 'access_show_building', 'access_show_org_link', 'offer_show'] as $callback) {
+            $this->assertStringContainsString($callback, $flat);
+        }
 
-        // Незаданные ссылки в меню не попадают; ключи не светятся ссылкой, только через callback
-        $this->assertStringNotContainsString('Как добраться', $flat);
-        $this->assertStringNotContainsString('Оплата', $flat);
-        $this->assertStringContainsString('access_show_keys', $flat);
+        // Незаданные ссылки в меню не попадают
+        $this->assertStringNotContainsString('link_show_map', $flat);
+        $this->assertStringNotContainsString('link_show_payment', $flat);
 
-        // График, как и ключи, — только по нажатию доверенным: прямой ссылки в меню нет
-        $this->assertStringContainsString('access_show_schedule', $flat);
-        $this->assertStringNotContainsString('https://example.com/schedule', $flat);
-        $this->assertStringNotContainsString('https://example.com/keys', $flat);
+        // Ни одной ссылки в сообщении: после ротации у клиента не остаётся рабочего старого адреса
+        $this->assertStringNotContainsString('example.com', $flat);
+        $this->assertStringNotContainsString('"url"', $flat);
+    }
+
+    public function test_banned_user_gets_the_collapsed_menu_even_if_trusted(): void
+    {
+        $botUser = $this->makeBotUser(['is_trusted' => true, 'is_banned' => true]);
+
+        $this->assertFalse($botUser->hasMaterialsAccess());
     }
 
     public function test_keys_link_is_hidden_from_untrusted_user(): void

@@ -46,7 +46,9 @@ class SendAccessMessageWithCallbackJob implements ShouldQueue
             // При принудительной пересылке (например, сотрудник удалил закреплённое
             // сообщение) на всякий случай снимаем старый пин — не критично, если
             // старого сообщения уже не существует, ошибка просто игнорируется
-            if ($this->force && $botUser->hasAccessMessage()) {
+            $oldMessageId = ($this->force && $botUser->hasAccessMessage()) ? $botUser->access_message_id : null;
+
+            if ($oldMessageId) {
                 TelegramMethods::sendQueryTelegram('unpinChatMessage', [
                     'chat_id' => $botUser->chat_id,
                     'message_id' => $botUser->access_message_id,
@@ -82,12 +84,41 @@ class SendAccessMessageWithCallbackJob implements ShouldQueue
                     'error' => $pinResponse->rawData['description'] ?? null,
                 ]);
             }
+
+            // Старое меню остаётся в истории чата со своими кнопками — убираем, чтобы после ротации
+            // доступов в переписке не осталось рабочих кнопок прежней раскладки
+            if ($oldMessageId) {
+                $this->removeOldMessage((int)$botUser->chat_id, (int)$oldMessageId);
+            }
         } catch (\Throwable $e) {
             Log::error('SendAccessMessageWithCallbackJob: исключение при отправке', [
                 'bot_user_id' => $this->botUserId,
                 'error' => $e->getMessage(),
             ]);
             (new LokiLogger())->logException($e);
+        }
+    }
+
+    /**
+     * @param int $chatId
+     * @param int $messageId
+     *
+     * @return void
+     */
+    private function removeOldMessage(int $chatId, int $messageId): void
+    {
+        $deleted = TelegramMethods::sendQueryTelegram('deleteMessage', [
+            'chat_id' => $chatId,
+            'message_id' => $messageId,
+        ]);
+
+        // Telegram не даёт удалить слишком старое сообщение — тогда хотя бы снимаем кнопки
+        if (!$deleted->ok) {
+            TelegramMethods::sendQueryTelegram('editMessageReplyMarkup', [
+                'chat_id' => $chatId,
+                'message_id' => $messageId,
+                'reply_markup' => ['inline_keyboard' => []],
+            ]);
         }
     }
 }
