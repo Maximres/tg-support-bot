@@ -18,6 +18,9 @@ class RentalLinks
 
     public const KEYS = ['hub', 'cabinets', 'map', 'schedule', 'payment', 'wifi', 'keys'];
 
+    /** Ссылки, доступные всем клиентам без открытия доступа */
+    public const PUBLIC = ['cabinets', 'map'];
+
     /** Названия, которые администратор может написать в /set_link => ключ */
     private const ALIASES = [
         'hub' => ['hub', 'инструкции', 'инструкция'],

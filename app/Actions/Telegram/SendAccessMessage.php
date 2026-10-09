@@ -6,14 +6,15 @@ use App\DTOs\TGTextMessageDto;
 use App\Enums\SafeCodeType;
 use App\Jobs\SendAccessMessageWithCallbackJob;
 use App\Models\BotUser;
+use App\Models\SafeCode;
 use App\Services\Rental\OfferDocument;
 use App\Services\Rental\RentalLinks;
 
 /**
  * Одноразовая отправка и закрепление в личном чате сотрудника меню материалов.
  *
- * Пока администратор не открыл доступ (и после его отзыва или блокировки) в меню только договор.
- * С доступом — все материалы: ссылки, коды, орг. информация. Ссылки в сообщение не вшиваются:
+ * Пока администратор не открыл доступ (и после его отзыва) в меню только открытые всем пункты: описание кабинетов,
+ * правила, как добраться и договор. С доступом — все материалы: ссылки и коды. Заблокированному клиенту — ничего. Ссылки в сообщение не вшиваются:
  * кнопки выдают актуальное значение при нажатии, поэтому ротация действует сразу.
  */
 class SendAccessMessage
@@ -42,7 +43,7 @@ class SendAccessMessage
             'text' => $this->buildText($botUser, $intro),
             'parse_mode' => 'html',
             'reply_markup' => [
-                'inline_keyboard' => $this->getKeyboard($botUser->hasMaterialsAccess()),
+                'inline_keyboard' => $this->getKeyboard($botUser->hasMaterialsAccess(), $botUser->isBanned()),
             ],
         ]);
 
@@ -69,39 +70,50 @@ class SendAccessMessage
     }
 
     /**
-     * Кнопки меню. Без доступа — только договор; с доступом — всё остальное.
-     * Ссылочные пункты без заданного значения пропускаются.
-     * Первая кнопка (описание кабинетов) — на всю ширину, остальные — по две в ряд,
-     * начиная с общей страницы инструкций.
+     * Кнопки меню. Всем (кроме заблокированных) доступны описание кабинетов, правила, как добраться и договор;
+     * график, ключи, коды и остальное — только при открытом доступе.
+     * Пункты без заданного значения пропускаются.
+     * Первая кнопка (описание кабинетов) — на всю ширину, остальные — по две в ряд.
      *
      * @param bool $hasAccess
+     * @param bool $banned    Заблокированному клиенту не показываем ничего
      *
      * @return array
      */
-    public function getKeyboard(bool $hasAccess = true): array
+    public function getKeyboard(bool $hasAccess = true, bool $banned = false): array
     {
-        $offerButton = !empty(OfferDocument::fileId())
-            ? ['text' => __('messages.but_menu_offer'), 'callback_data' => 'offer_show']
-            : null;
-
-        if (!$hasAccess) {
-            return $offerButton ? [[$offerButton]] : [];
+        if ($banned) {
+            return [];
         }
 
         $buttons = [];
 
-        foreach (['hub', 'map', 'schedule', 'payment', 'wifi', 'keys'] as $key) {
-            if (!empty(RentalLinks::get($key))) {
+        $linkButton = function (string $key) use (&$buttons, $hasAccess) {
+            if (!empty(RentalLinks::get($key)) && ($hasAccess || in_array($key, RentalLinks::PUBLIC, true))) {
                 $buttons[] = ['text' => __("messages.but_menu_{$key}"), 'callback_data' => "link_show_{$key}"];
+            }
+        };
+
+        if ($hasAccess) {
+            $linkButton('hub');
+        }
+
+        if (SafeCode::current(SafeCodeType::ORG_LINK)) {
+            $buttons[] = ['text' => SafeCodeType::ORG_LINK->buttonLabel(), 'callback_data' => SafeCodeType::ORG_LINK->callbackData()];
+        }
+
+        foreach (['map', 'schedule', 'payment', 'wifi', 'keys'] as $key) {
+            $linkButton($key);
+        }
+
+        if ($hasAccess) {
+            foreach ([SafeCodeType::SAFE, SafeCodeType::BUILDING] as $type) {
+                $buttons[] = ['text' => $type->buttonLabel(), 'callback_data' => $type->callbackData()];
             }
         }
 
-        foreach ([SafeCodeType::ORG_LINK, SafeCodeType::SAFE, SafeCodeType::BUILDING] as $type) {
-            $buttons[] = ['text' => $type->buttonLabel(), 'callback_data' => $type->callbackData()];
-        }
-
-        if ($offerButton) {
-            $buttons[] = $offerButton;
+        if (!empty(OfferDocument::fileId())) {
+            $buttons[] = ['text' => __('messages.but_menu_offer'), 'callback_data' => 'offer_show'];
         }
 
         $keyboard = [];

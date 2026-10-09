@@ -15,10 +15,10 @@ return [
     'command_code_value' => ':type: <code>:code</code>',
     'command_code_not_set' => ':type ещё не задан(а).',
 
-    // Личный доступ к кодам и орг. информации по кнопке
+    // Личный доступ к кодам и правилам по кнопке
     'but_access_open_org_link' => 'Открыть',
     'access_message_text' => "Здесь собраны материалы по аренде кабинета — нажмите нужную кнопку.\nВопросы — пишите в этот чат.:phone_line",
-    'access_message_text_locked' => "Материалы по аренде (инструкции, график, ключи, коды) откроются после того, как администратор подтвердит ваш доступ — вы получите уведомление. Договор можно посмотреть по кнопке ниже.\nВопросы — пишите в этот чат.:phone_line",
+    'access_message_text_locked' => "Описание кабинетов, правила, как добраться и договор доступны по кнопкам ниже. Остальные материалы (график, ключи, коды) откроются после того, как администратор подтвердит ваш доступ — вы получите уведомление.\nВопросы — пишите в этот чат.:phone_line",
     'access_granted_notice' => '✅ Вам открыт доступ к материалам по аренде. Меню обновлено — загляните в закреплённое сообщение.',
     'access_revoked_notice' => '🔒 Доступ к материалам закрыт. Если это ошибка — напишите в этот чат.',
     'access_link_message' => '🔗 :title — актуальная ссылка:',
@@ -71,8 +71,8 @@ return [
     'access_not_trusted' => 'Доступ не открыт. Обратитесь к администратору.',
     'access_value_not_set' => ':type ещё не задан(а).',
     'access_value_reveal' => ':type: :value',
-    'access_org_link_not_set' => 'Ссылка на орг. информацию ещё не задана.',
-    'access_org_link_message' => 'Актуальная ссылка на орг. информацию:',
+    'access_org_link_not_set' => 'Ссылка на правила ещё не задана.',
+    'access_org_link_message' => 'Актуальная ссылка на правила:',
     'access_rotated' => '🔐 :type обновлён(а).',
 
     'but_close_topic' => '🚪 Закрыть обращение',
@@ -96,7 +96,7 @@ return [
     'command_edit_email_description' => 'Изменить Email',
     'command_code_description' => 'Получить код от сейфа',
     'command_building_code_description' => 'Получить код от здания',
-    'command_org_link_description' => 'Получить ссылку на орг. информацию',
+    'command_org_link_description' => 'Получить ссылку на правила',
     'command_restore_access_description' => 'Восстановить сообщение с кнопками доступа к кодам',
 
     // Описания команд для администраторов
@@ -106,7 +106,7 @@ return [
     'command_restore_topic_name_description' => 'Восстановить название топика по умолчанию',
     'command_set_code_description' => 'Задать новый код сейфа (использование: /set_code значение)',
     'command_set_building_code_description' => 'Задать новый код от здания (использование: /set_building_code значение)',
-    'command_set_org_link_description' => 'Задать ссылку на орг. информацию (использование: /set_org_link ссылка)',
+    'command_set_org_link_description' => 'Задать ссылку на правила (использование: /set_org_link ссылка)',
     'command_rename_topic_request' => "Пожалуйста, укажите новое название топика после команды:
 <code>/rename_topic новое название</code>
 
@@ -131,13 +131,13 @@ return [
         'prompt_set_offer' => '📄 Ответьте на это сообщение PDF-файлом договора.',
         'prompt_set_code' => '🔐 Ответьте на это сообщение новым кодом от сейфа.',
         'prompt_set_building_code' => '🔐 Ответьте на это сообщение новым кодом от здания.',
-        'prompt_set_org_link' => '👥 Ответьте на это сообщение ссылкой на орг. информацию (https://…).',
+        'prompt_set_org_link' => '👥 Ответьте на это сообщение ссылкой на правила (https://…).',
         'prompt_backup_time' => '🕒 Ответьте на это сообщение временем запуска бэкапа в формате ЧЧ:ММ, например 03:30.',
         'but_show_offer' => '📄 Договор',
         'but_set_offer' => '📄 Заменить договор',
         'but_set_code' => '🔐 Код сейфа',
         'but_set_building_code' => '🔐 Код здания',
-        'but_set_org_link' => '👥 Орг. ссылка',
+        'but_set_org_link' => '📋 Правила',
         'but_backup_status' => '🗄 Статус бэкапа',
         'but_backup_now' => '🗄 Бэкап сейчас',
         'but_backup_on' => '✅ Бэкап вкл',
@@ -200,7 +200,7 @@ return [
     'command_set_org_link_invalid' => '⚠️ Пожалуйста, укажите корректную ссылку, начинающуюся с http:// или https://.',
     'command_set_value_unchanged' => 'ℹ️ :type уже установлен(а) — значение не изменилось.',
     'command_set_value_saved' => '✅ :type обновлён(а). Доверенные пользователи получат уведомление.',
-    'command_set_org_link_saved' => '✅ Ссылка на орг. информацию обновлена.',
+    'command_set_org_link_saved' => '✅ Ссылка на правила обновлена.',
     'command_set_value_error' => '❌ Не удалось сохранить значение. Попробуйте ещё раз.',
 
     // Регистрация пользователя

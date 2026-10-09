@@ -169,6 +169,21 @@ class LinkRotationTest extends TestCase
         $this->assertSame(2, $this->sentCount('answerCallbackQuery'));
     }
 
+    public function test_public_links_are_given_without_access_but_not_to_banned_users(): void
+    {
+        config(['rental.links.map' => 'https://example.com/map', 'rental.links.cabinets' => 'https://example.com/cabinets']);
+
+        $untrusted = $this->makeBotUser(['is_trusted' => false]);
+        $banned = $this->makeBotUser(['is_trusted' => true, 'is_banned' => true]);
+
+        (new ShowRentalMaterial())->showLink($this->callbackDto($untrusted, 'link_show_cabinets'), $untrusted, 'cabinets');
+        (new ShowRentalMaterial())->showLink($this->callbackDto($untrusted, 'link_show_map'), $untrusted, 'map');
+        (new ShowRentalMaterial())->showLink($this->callbackDto($banned, 'link_show_map'), $banned, 'map');
+
+        $this->assertSame(2, $this->sentToUser($untrusted));
+        $this->assertSame(0, $this->sentToUser($banned));
+    }
+
     // ---- /set_link
 
     public function test_admin_sets_link_by_russian_and_english_names(): void

@@ -7,7 +7,9 @@ use App\Actions\Telegram\SendAccessMessage;
 use App\Actions\Telegram\SendContactMessage;
 use App\Actions\Telegram\SendOfferMessage;
 use App\Actions\Telegram\ShowRentalMaterial;
+use App\Enums\SafeCodeType;
 use App\Models\BotUser;
+use App\Models\SafeCode;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -163,22 +165,46 @@ class RentalOnboardingTest extends TestCase
         Http::assertSent(fn (Request $r) => str_contains($r->url(), 'pinChatMessage'));
     }
 
-    public function test_menu_without_access_contains_only_the_offer(): void
+    public function test_menu_without_access_has_only_the_public_items(): void
     {
+        config(['rental.links.map' => 'https://example.com/map']);
+        SafeCode::create(['code' => 'https://example.com/rules', 'type' => SafeCodeType::ORG_LINK->value]);
+
         $keyboard = (new SendAccessMessage())->getKeyboard(false);
 
-        $this->assertSame([[['text' => '📄 Договор', 'callback_data' => 'offer_show']]], $keyboard);
+        // Описание кабинетов сверху, затем правила, как добраться и договор
+        $this->assertSame([
+            [['text' => '🏠 Описание кабинетов', 'callback_data' => 'link_show_cabinets']],
+            [
+                ['text' => '📋 Правила', 'callback_data' => 'access_show_org_link'],
+                ['text' => '🗺 Как добраться', 'callback_data' => 'link_show_map'],
+            ],
+            [['text' => '📄 Договор', 'callback_data' => 'offer_show']],
+        ], $keyboard);
     }
 
-    public function test_menu_without_access_and_without_offer_is_empty(): void
+    public function test_menu_without_access_hides_everything_else(): void
     {
-        config(['rental.offer_document' => null]);
+        $flat = json_encode((new SendAccessMessage())->getKeyboard(false), JSON_UNESCAPED_UNICODE);
+
+        foreach (['link_show_hub', 'link_show_schedule', 'link_show_wifi', 'link_show_keys', 'access_show_safe', 'access_show_building'] as $callback) {
+            $this->assertStringNotContainsString($callback, $flat);
+        }
+    }
+
+    public function test_menu_is_empty_for_banned_user_and_when_nothing_is_set(): void
+    {
+        $this->assertSame([], (new SendAccessMessage())->getKeyboard(true, true));
+
+        config(['rental.offer_document' => null, 'rental.links' => []]);
 
         $this->assertSame([], (new SendAccessMessage())->getKeyboard(false));
     }
 
     public function test_menu_with_access_has_every_item_but_no_direct_links(): void
     {
+        SafeCode::create(['code' => 'https://example.com/rules', 'type' => SafeCodeType::ORG_LINK->value]);
+
         $keyboard = (new SendAccessMessage())->getKeyboard(true);
         $flat = json_encode($keyboard, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
@@ -187,6 +213,7 @@ class RentalOnboardingTest extends TestCase
         $this->assertSame('link_show_cabinets', $keyboard[0][0]['callback_data']);
         $this->assertSame('📋 Все инструкции', $keyboard[1][0]['text']);
         $this->assertSame('link_show_hub', $keyboard[1][0]['callback_data']);
+        $this->assertSame('📋 Правила', $keyboard[1][1]['text']);
         $this->assertSame('🏠 Описание кабинетов', $keyboard[0][0]['text']);
 
         foreach (['link_show_cabinets', 'link_show_wifi', 'link_show_schedule', 'link_show_keys', 'access_show_safe', 'access_show_building', 'access_show_org_link', 'offer_show'] as $callback) {

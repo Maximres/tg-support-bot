@@ -11,7 +11,8 @@ use App\Services\Rental\RentalLinks;
 
 /**
  * Пункты меню материалов, которые не сводятся к простому показу значения:
- * повторный показ договора (всем) и ссылки на материалы (только при открытом доступе)
+ * повторный показ договора (всем) и ссылки на материалы (описание кабинетов и как добраться — всем,
+ * остальные — только при открытом доступе)
  */
 class ShowRentalMaterial
 {
@@ -92,7 +93,11 @@ class ShowRentalMaterial
             return;
         }
 
-        if (!$botUser->hasMaterialsAccess()) {
+        $isAllowed = in_array($key, RentalLinks::PUBLIC, true)
+            ? !$botUser->isBanned()
+            : $botUser->hasMaterialsAccess();
+
+        if (!$isAllowed) {
             $this->ack($update->callbackId, __('messages.access_not_trusted'), true);
             return;
         }

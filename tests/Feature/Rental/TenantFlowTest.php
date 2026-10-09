@@ -202,10 +202,13 @@ class TenantFlowTest extends TestCase
         // 8. Карточка обновилась
         $this->assertSame(1, $this->sentCount('editMessageText', fn ($r) => str_contains($r['text'] ?? '', 'Оферта принята')));
 
-        // 9. Пока доступ не открыт, в меню только договор: ни ссылок, ни кодов
+        // 9. Пока доступ не открыт, в меню только открытые всем пункты: ни графика, ни ключей, ни кодов
         $menu = $this->menuKeyboardJson();
         $this->assertStringContainsString('offer_show', $menu);
-        $this->assertStringNotContainsString('link_show_', $menu);
+        $this->assertStringContainsString('link_show_cabinets', $menu);
+        foreach (['link_show_hub', 'link_show_schedule', 'link_show_wifi', 'link_show_keys'] as $closed) {
+            $this->assertStringNotContainsString($closed, $menu);
+        }
         $this->assertStringNotContainsString('access_show_', $menu);
         $this->assertStringNotContainsString('example.com', $menu);
 
@@ -230,7 +233,7 @@ class TenantFlowTest extends TestCase
 
         // 10c. Отзыв доступа: меню снова сворачивается, ссылка не отдаётся
         (new TrustContactMessage())->execute($botUser->fresh(), false);
-        $this->assertStringNotContainsString('link_show_', $this->menuKeyboardJson());
+        $this->assertStringNotContainsString('link_show_keys', $this->menuKeyboardJson());
 
         $before = $linksSent();
         (new ShowRentalMaterial())->showLink($this->callbackDto('link_show_keys'), $botUser->fresh(), 'keys');
@@ -292,6 +295,6 @@ class TenantFlowTest extends TestCase
         $this->assertSame(1, $this->sentCount('deleteMessage', fn ($r) => (int)$r['message_id'] === 356));
         $menu = $this->menuKeyboardJson();
         $this->assertStringContainsString('offer_show', $menu);
-        $this->assertStringNotContainsString('link_show_', $menu);
+        $this->assertStringNotContainsString('link_show_keys', $menu);
     }
 }

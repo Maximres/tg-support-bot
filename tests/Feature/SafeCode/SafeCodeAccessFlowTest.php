@@ -243,7 +243,7 @@ class SafeCodeAccessFlowTest extends TestCase
     {
         $this->chatMemberStatus = 'administrator';
 
-        // Орг. информация, как и остальные материалы, выдаётся только при открытом доступе
+        // Правила доступны всем; доверенный пользователь — частный случай
         $botUser = $this->makeBotUser(['is_trusted' => true]);
 
         (new SetTrustedValue())->execute($this->groupCommandDto('/set_org_link https://old.example.com'), SafeCodeType::ORG_LINK);
@@ -263,20 +263,25 @@ class SafeCodeAccessFlowTest extends TestCase
             && str_contains($r['reply_markup'] ?? '', 'new.example.com'));
     }
 
-    public function test_org_link_is_not_given_to_untrusted_user(): void
+    public function test_rules_link_is_given_to_untrusted_user_but_not_to_banned(): void
     {
         $this->chatMemberStatus = 'administrator';
         (new SetTrustedValue())->execute($this->groupCommandDto('/set_org_link https://old.example.com'), SafeCodeType::ORG_LINK);
 
-        $botUser = $this->makeBotUser(['is_trusted' => false]);
-        $dto = TelegramUpdate_SafeCodeButtonMock::getDto(
-            TelegramUpdate_SafeCodeButtonMock::getDtoParams($botUser->chat_id, SafeCodeType::ORG_LINK->callbackData())
-        );
+        $untrusted = $this->makeBotUser(['is_trusted' => false]);
+        $banned = $this->makeBotUser(['is_trusted' => true, 'is_banned' => true]);
 
-        (new ShowTrustedValue())->execute($dto, $botUser, SafeCodeType::ORG_LINK);
+        foreach ([$untrusted, $banned] as $botUser) {
+            $dto = TelegramUpdate_SafeCodeButtonMock::getDto(
+                TelegramUpdate_SafeCodeButtonMock::getDtoParams($botUser->chat_id, SafeCodeType::ORG_LINK->callbackData())
+            );
+            (new ShowTrustedValue())->execute($dto, $botUser, SafeCodeType::ORG_LINK);
+        }
 
-        Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'sendMessage') && ($r['chat_id'] ?? null) == $botUser->chat_id);
-        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'answerCallbackQuery'));
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'sendMessage')
+            && ($r['chat_id'] ?? null) == $untrusted->chat_id
+            && str_contains(json_encode($r['reply_markup'] ?? ''), 'old.example.com'));
+        Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'sendMessage') && ($r['chat_id'] ?? null) == $banned->chat_id);
     }
 
     public function test_unrecognized_callback_data_is_still_acknowledged(): void

@@ -16,7 +16,8 @@ enum SafeCodeType: string
      */
     public function requiresTrust(): bool
     {
-        return true;
+        // Правила (ссылка) видны всем; коды — только доверенным
+        return !$this->isUrl();
     }
 
     /**
@@ -66,7 +67,7 @@ enum SafeCodeType: string
         return match ($this) {
             self::SAFE => 'Код от сейфа',
             self::BUILDING => 'Код от здания',
-            self::ORG_LINK => 'Ссылка на орг. информацию',
+            self::ORG_LINK => 'Ссылка на правила',
         };
     }
 
@@ -78,7 +79,7 @@ enum SafeCodeType: string
         return match ($this) {
             self::SAFE => '🔐 Код сейфа',
             self::BUILDING => '🔐 Код здания',
-            self::ORG_LINK => 'ℹ️ Орг. информация',
+            self::ORG_LINK => '📋 Правила',
         };
     }
 }

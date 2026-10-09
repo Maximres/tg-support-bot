@@ -67,7 +67,7 @@ class RefreshAccessMessage
             'message_id' => $botUser->access_message_id,
             'text' => $menu->buildText($botUser),
             'parse_mode' => 'html',
-            'reply_markup' => ['inline_keyboard' => $menu->getKeyboard($botUser->hasMaterialsAccess())],
+            'reply_markup' => ['inline_keyboard' => $menu->getKeyboard($botUser->hasMaterialsAccess(), $botUser->isBanned())],
         ]);
 
         $description = (string)($response->rawData['description'] ?? '');
