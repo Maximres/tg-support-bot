@@ -119,7 +119,7 @@ class AdminPanelTest extends TestCase
         $this->assertCount(1, $sent);
         $keyboard = $this->markup($sent[0][0]);
 
-        foreach (['show_offer', 'set_offer', 'rotate', 'backup_status', 'backup_now', 'backup_on', 'backup_off', 'backup_time'] as $action) {
+        foreach (['show_offer', 'set_offer', 'rotate', 'backup_status', 'backup_now', 'backup_on', 'backup_off', 'backup_time', 'backup_days', 'backup_to'] as $action) {
             $this->assertStringContainsString("panel:{$action}", $keyboard);
         }
 

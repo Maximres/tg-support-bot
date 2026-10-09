@@ -48,6 +48,11 @@ class BackupTest extends TestCase
                 return Http::response(['ok' => true, 'result' => ['status' => $this->chatMemberStatus]]);
             }
 
+            // Получатель, который не запускал бота
+            if (($request['chat_id'] ?? null) == 404404) {
+                return Http::response(['ok' => false, 'error_code' => 400, 'description' => 'Bad Request: chat not found'], 400);
+            }
+
             return Http::response(['ok' => true, 'result' => ['message_id' => 1]]);
         });
 
@@ -231,6 +236,130 @@ class BackupTest extends TestCase
         $this->travelTo(now('Europe/Minsk')->setTime(23, 59, 30));
         $this->service->runIfDue();
         $this->assertSame(1, $this->service->dumps);
+    }
+
+    public function test_backup_days_is_validated_and_saved(): void
+    {
+        foreach (['/backup_days', '/backup_days 0', '/backup_days 31', '/backup_days abc', '/backup_days 1.5'] as $bad) {
+            $this->command($bad);
+            $this->assertStringContainsString('от 1 до 30', $this->lastReplyText());
+        }
+        $this->assertSame(1, $this->service->days());
+
+        $this->command('/backup_days 3');
+        $this->assertSame(3, $this->service->days());
+        $this->assertStringContainsString('раз в 3 дн.', $this->lastReplyText());
+
+        $this->command('/backup_days 1');
+        $this->assertStringContainsString('ежедневно', $this->lastReplyText());
+    }
+
+    public function test_scheduler_respects_the_days_interval(): void
+    {
+        $this->service->setEnabled(true);
+        $this->service->setTime('00:00');
+        $this->service->setDays(3);
+
+        $start = \Carbon\Carbon::parse('2026-10-10 12:00', 'Europe/Minsk');
+
+        $this->travelTo($start);
+        $this->service->runIfDue();
+        $this->assertSame(1, $this->service->dumps);
+
+        $this->travelTo($start->copy()->addDay());
+        $this->service->runIfDue();
+        $this->travelTo($start->copy()->addDays(2));
+        $this->service->runIfDue();
+        $this->assertSame(1, $this->service->dumps);
+
+        $this->travelTo($start->copy()->addDays(3));
+        $this->service->runIfDue();
+        $this->service->runIfDue();
+        $this->assertSame(2, $this->service->dumps);
+    }
+
+    public function test_changing_days_applies_from_the_last_run(): void
+    {
+        $this->service->setEnabled(true);
+        $this->service->setTime('00:00');
+
+        $start = \Carbon\Carbon::parse('2026-10-10 12:00', 'Europe/Minsk');
+        $this->travelTo($start);
+        $this->service->runIfDue();
+
+        // Уже запускали вчера, а теперь поставили «раз в 2 дня» — завтра запуска нет, послезавтра есть
+        $this->service->setDays(2);
+        $this->travelTo($start->copy()->addDay());
+        $this->service->runIfDue();
+        $this->assertSame(1, $this->service->dumps);
+
+        $this->travelTo($start->copy()->addDays(2));
+        $this->service->runIfDue();
+        $this->assertSame(2, $this->service->dumps);
+    }
+
+    public function test_recipient_can_be_changed_by_id_and_receives_the_backup(): void
+    {
+        $this->command('/backup_to 987654321');
+
+        $this->assertSame('987654321', $this->service->chatId());
+        $this->assertStringContainsString('987654321', $this->lastReplyText());
+
+        // Проверочное сообщение ушло новому получателю
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'sendMessage') && ($r['chat_id'] ?? null) == '987654321');
+
+        $this->command('/backup_now');
+
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'sendDocument') && ($r['chat_id'] ?? null) == '987654321');
+        Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'sendDocument') && ($r['chat_id'] ?? null) == '555000');
+    }
+
+    public function test_recipient_me_uses_the_sender(): void
+    {
+        $this->command('/backup_to я');
+
+        $this->assertSame('777', $this->service->chatId());
+    }
+
+    public function test_recipient_me_is_rejected_for_anonymous_admin(): void
+    {
+        $dto = TelegramUpdateDto::fromRequest(RequestFacade::create('api/telegram/bot', 'POST', [
+            'update_id' => time(),
+            'message' => [
+                'message_id' => time(),
+                'from' => ['id' => TelegramUpdateDto::ANONYMOUS_ADMIN_ID, 'is_bot' => true, 'first_name' => 'Group', 'username' => 'GroupAnonymousBot'],
+                'chat' => ['id' => -1001234567890, 'title' => 'Test Group', 'is_forum' => true, 'type' => 'supergroup'],
+                'date' => time(),
+                'text' => '/backup_to me',
+            ],
+        ]));
+
+        (new HandleBackupCommand())->execute($dto, '/backup_to');
+
+        $this->assertSame('555000', $this->service->chatId());
+        $this->assertStringContainsString('анонимно', $this->lastReplyText());
+    }
+
+    public function test_invalid_or_unreachable_recipient_keeps_the_previous_one(): void
+    {
+        foreach (['/backup_to', '/backup_to abc', '/backup_to 123', '/backup_to 0'] as $bad) {
+            $this->command($bad);
+            $this->assertStringContainsString('числовой id', $this->lastReplyText());
+        }
+
+        $this->command('/backup_to 404404');
+        $this->assertStringContainsString('/start', $this->lastReplyText());
+
+        $this->assertSame('555000', $this->service->chatId());
+    }
+
+    public function test_status_shows_schedule_and_recipient(): void
+    {
+        $this->service->setDays(7);
+        $this->command('/backup_status');
+
+        $this->assertStringContainsString('раз в 7 дн.', $this->lastReplyText());
+        $this->assertStringContainsString('555000', $this->lastReplyText());
     }
 
     public function test_status_reports_last_result(): void

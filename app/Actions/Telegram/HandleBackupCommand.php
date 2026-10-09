@@ -7,11 +7,12 @@ use App\DTOs\TGTextMessageDto;
 use App\Jobs\SendTelegramSimpleQueryJob;
 use App\Logging\LokiLogger;
 use App\Services\Backup\DatabaseBackupService;
+use App\TelegramBot\TelegramMethods;
 use Illuminate\Support\Facades\Log;
 
 /**
  * Управление бэкапом БД администраторами из служебной супергруппы:
- * /backup_on, /backup_off, /backup_time ЧЧ:ММ, /backup_now, /backup_status
+ * /backup_on, /backup_off, /backup_time ЧЧ:ММ, /backup_days N, /backup_to ID, /backup_now, /backup_status
  */
 class HandleBackupCommand
 {
@@ -19,6 +20,8 @@ class HandleBackupCommand
         '/backup_on',
         '/backup_off',
         '/backup_time',
+        '/backup_days',
+        '/backup_to',
         '/backup_now',
         '/backup_status',
     ];
@@ -51,6 +54,8 @@ class HandleBackupCommand
                 '/backup_on' => $this->enable(),
                 '/backup_off' => $this->disable(),
                 '/backup_time' => $this->setTime($update->text, $command),
+                '/backup_days' => $this->setDays($update->text, $command),
+                '/backup_to' => $this->setRecipient($update->text, $command, $update->fromUserId),
                 '/backup_status' => $this->status(),
                 '/backup_now' => $this->runNow($groupId, $update->messageThreadId),
                 default => null,
@@ -114,6 +119,94 @@ class HandleBackupCommand
     }
 
     /**
+     * @param string|null $text
+     * @param string      $command
+     *
+     * @return string
+     */
+    private function setDays(?string $text, string $command): string
+    {
+        $days = $this->argument($text, $command);
+
+        if (!DatabaseBackupService::isValidDays($days)) {
+            return __('messages.backup.days_invalid', ['max' => DatabaseBackupService::MAX_DAYS]);
+        }
+
+        $this->backup->setDays((int)$days);
+
+        return __('messages.backup.days_set', [
+            'schedule' => $this->schedule((int)$days),
+            'time' => $this->backup->time(),
+            'tz' => config('backup.timezone'),
+        ]);
+    }
+
+    /**
+     * Сменить получателя копий. Принимает id пользователя/группы или слово «я» (тот, кто пишет команду).
+     * Перед сохранением отправляет получателю проверочное сообщение: если доставить нельзя
+     * (получатель ещё не запускал бота), прежний получатель остаётся.
+     *
+     * @param string|null $text
+     * @param string      $command
+     * @param int|null    $fromUserId
+     *
+     * @return string
+     */
+    private function setRecipient(?string $text, string $command, ?int $fromUserId): string
+    {
+        $argument = mb_strtolower($this->argument($text, $command));
+
+        if (in_array($argument, ['я', 'me'], true)) {
+            if (empty($fromUserId) || $fromUserId === TelegramUpdateDto::ANONYMOUS_ADMIN_ID) {
+                return __('messages.backup.recipient_anonymous');
+            }
+
+            $argument = (string)$fromUserId;
+        }
+
+        if (!DatabaseBackupService::isValidChatId($argument)) {
+            return __('messages.backup.recipient_invalid');
+        }
+
+        $response = TelegramMethods::sendQueryTelegram('sendMessage', [
+            'chat_id' => $argument,
+            'text' => __('messages.backup.recipient_test'),
+        ]);
+
+        if (!$response->ok) {
+            return __('messages.backup.recipient_unreachable', [
+                'id' => $argument,
+                'error' => (string)($response->rawData['description'] ?? 'unknown'),
+            ]);
+        }
+
+        $this->backup->setChatId($argument);
+
+        return __('messages.backup.recipient_set', ['id' => $argument]);
+    }
+
+    /**
+     * @param string|null $text
+     * @param string      $command
+     *
+     * @return string
+     */
+    private function argument(?string $text, string $command): string
+    {
+        return trim(preg_replace('/^' . preg_quote($command, '/') . '(?:@\w+)?\s*/i', '', (string)$text));
+    }
+
+    /**
+     * @param int $days
+     *
+     * @return string
+     */
+    private function schedule(int $days): string
+    {
+        return $days === 1 ? __('messages.backup.schedule_daily') : __('messages.backup.schedule_every', ['days' => $days]);
+    }
+
+    /**
      * @return string
      */
     private function status(): string
@@ -123,9 +216,11 @@ class HandleBackupCommand
         $lines = [
             __('messages.backup.status_state', [
                 'state' => $status['enabled'] ? __('messages.backup.state_on') : __('messages.backup.state_off'),
+                'schedule' => $this->schedule($status['days']),
                 'time' => $status['time'],
                 'tz' => $status['timezone'],
             ]),
+            __('messages.backup.status_recipient', ['id' => $status['chat_id'] ?? '—']),
         ];
 
         if ($status['last_at'] === null) {
@@ -178,7 +273,11 @@ class HandleBackupCommand
      */
     private function timeParams(): array
     {
-        return ['time' => $this->backup->time(), 'tz' => config('backup.timezone')];
+        return [
+            'schedule' => $this->schedule($this->backup->days()),
+            'time' => $this->backup->time(),
+            'tz' => config('backup.timezone'),
+        ];
     }
 
     /**

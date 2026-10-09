@@ -139,6 +139,14 @@ class SetBotCommands
                 'description' => __('messages.command_backup_time_description'),
             ],
             [
+                'command' => 'backup_days',
+                'description' => __('messages.command_backup_days_description'),
+            ],
+            [
+                'command' => 'backup_to',
+                'description' => __('messages.command_backup_to_description'),
+            ],
+            [
                 'command' => 'backup_now',
                 'description' => __('messages.command_backup_now_description'),
             ],

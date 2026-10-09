@@ -52,6 +52,8 @@ class AdminPanel
         'set_building_code' => ['/set_building_code', 'messages.panel.prompt_set_building_code'],
         'set_org_link' => ['/set_org_link', 'messages.panel.prompt_set_org_link'],
         'backup_time' => ['/backup_time', 'messages.panel.prompt_backup_time'],
+        'backup_days' => ['/backup_days', 'messages.panel.prompt_backup_days'],
+        'backup_to' => ['/backup_to', 'messages.panel.prompt_backup_to'],
     ];
 
     /**
@@ -316,7 +318,9 @@ class AdminPanel
             [$button('show_offer'), $button('set_offer')],
             [$button('rotate')],
             [$button('backup_status'), $button('backup_now')],
-            [$button('backup_on'), $button('backup_off'), $button('backup_time')],
+            [$button('backup_on'), $button('backup_off')],
+            [$button('backup_time'), $button('backup_days')],
+            [$button('backup_to')],
         ];
     }
 

@@ -26,6 +26,10 @@ class DatabaseBackupService
 
     public const KEY_TIME = 'backup.time';
 
+    public const KEY_DAYS = 'backup.days';
+
+    public const KEY_CHAT_ID = 'backup.chat_id';
+
     public const KEY_LAST_RUN_DATE = 'backup.last_run_date';
 
     public const KEY_LAST_AT = 'backup.last_at';
@@ -37,6 +41,10 @@ class DatabaseBackupService
     public const KEY_LAST_ERROR = 'backup.last_error';
 
     public const DEFAULT_TIME = '03:30';
+
+    public const DEFAULT_DAYS = 1;
+
+    public const MAX_DAYS = 30;
 
     /**
      * @return bool
@@ -87,13 +95,89 @@ class DatabaseBackupService
     }
 
     /**
+     * Как часто делать копию: раз в N дней
+     *
+     * @return int
+     */
+    public function days(): int
+    {
+        $days = (int)BotSetting::get(self::KEY_DAYS, (string)self::DEFAULT_DAYS);
+
+        return $days >= 1 && $days <= self::MAX_DAYS ? $days : self::DEFAULT_DAYS;
+    }
+
+    /**
+     * @param int $days
+     *
+     * @return void
+     */
+    public function setDays(int $days): void
+    {
+        BotSetting::set(self::KEY_DAYS, (string)$days);
+    }
+
+    /**
+     * @param string $days
+     *
+     * @return bool
+     */
+    public static function isValidDays(string $days): bool
+    {
+        return ctype_digit($days) && (int)$days >= 1 && (int)$days <= self::MAX_DAYS;
+    }
+
+    /**
+     * Чат, куда уходят копии: заданный администратором в Telegram, иначе из настроек сервера
+     *
+     * @return string|null
+     */
+    public function chatId(): ?string
+    {
+        $chatId = BotSetting::get(self::KEY_CHAT_ID);
+
+        if (!empty($chatId)) {
+            return (string)$chatId;
+        }
+
+        $fromConfig = config('backup.chat_id');
+
+        return empty($fromConfig) ? null : (string)$fromConfig;
+    }
+
+    /**
+     * @param string $chatId
+     *
+     * @return void
+     */
+    public function setChatId(string $chatId): void
+    {
+        BotSetting::set(self::KEY_CHAT_ID, $chatId);
+    }
+
+    /**
+     * Id пользователя или группы: целое число, не ноль
+     *
+     * @param string $chatId
+     *
+     * @return bool
+     */
+    public static function isValidChatId(string $chatId): bool
+    {
+        return (bool)preg_match('/^-?[1-9]\d{4,18}$/', $chatId);
+    }
+
+    /**
      * Не хватает настроек сервера, без которых копия не уйдёт за пределы сервера
      *
      * @return string|null текст проблемы или null, если всё настроено
      */
     public function configurationProblem(): ?string
     {
-        if (empty(config('backup.chat_id')) || empty(config('backup.passphrase'))) {
+        if (empty($this->chatId())) {
+            return __('messages.backup.no_recipient');
+        }
+
+        if (empty(config('backup.passphrase'))) {
             return __('messages.backup.not_configured');
         }
 
@@ -101,7 +185,7 @@ class DatabaseBackupService
     }
 
     /**
-     * @return array{enabled: bool, time: string, timezone: string, last_at: ?string, last_ok: ?bool, last_size: ?int, last_error: ?string, local_copies: int}
+     * @return array{enabled: bool, time: string, days: int, chat_id: ?string, timezone: string, last_at: ?string, last_ok: ?bool, last_size: ?int, last_error: ?string, local_copies: int}
      */
     public function status(): array
     {
@@ -112,6 +196,8 @@ class DatabaseBackupService
         return [
             'enabled' => $this->isEnabled(),
             'time' => $this->time(),
+            'days' => $this->days(),
+            'chat_id' => $this->chatId(),
             'timezone' => config('backup.timezone'),
             'last_at' => $lastAt ? Carbon::parse($lastAt, 'UTC')->setTimezone(config('backup.timezone'))->format('d.m.Y H:i') : null,
             'last_ok' => $lastOk === null ? null : $lastOk === '1',
@@ -122,8 +208,8 @@ class DatabaseBackupService
     }
 
     /**
-     * Вызывается планировщиком каждую минуту: запускает бэкап один раз в день,
-     * когда наступило заданное время (если сервер был выключен — при первом запуске после)
+     * Вызывается планировщиком каждую минуту: запускает бэкап, когда наступил заданный день
+     * (раз в N дней) и время (если сервер был выключен — при первом запуске после)
      *
      * @return void
      */
@@ -139,8 +225,19 @@ class DatabaseBackupService
             return;
         }
 
-        if (BotSetting::get(self::KEY_LAST_RUN_DATE) === $now->toDateString()) {
+        $lastRunDate = BotSetting::get(self::KEY_LAST_RUN_DATE);
+
+        if ($lastRunDate === $now->toDateString()) {
             return;
+        }
+
+        if (!empty($lastRunDate)) {
+            $daysSinceLastRun = (int)Carbon::parse($lastRunDate, config('backup.timezone'))->startOfDay()
+                ->diffInDays($now->copy()->startOfDay(), true);
+
+            if ($daysSinceLastRun < $this->days()) {
+                return;
+            }
         }
 
         // Отмечаем запуск заранее, чтобы при сбое не повторять каждую минуту
@@ -296,7 +393,7 @@ class DatabaseBackupService
         }
 
         $response = $request->post('https://api.telegram.org/bot' . config('traffic_source.settings.telegram.token') . '/sendDocument', [
-            'chat_id' => config('backup.chat_id'),
+            'chat_id' => $this->chatId(),
             'caption' => __('messages.backup.caption', ['stamp' => $stamp, 'size' => intdiv($size, 1024)]),
         ]);
 
@@ -347,7 +444,7 @@ class DatabaseBackupService
      */
     private function notify(string $text): void
     {
-        $chatId = config('backup.chat_id');
+        $chatId = $this->chatId();
         if (empty($chatId)) {
             return;
         }
