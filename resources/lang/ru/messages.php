@@ -77,7 +77,6 @@ return [
     'access_rotated' => '🔐 :type обновлён(а).',
 
     'but_close_topic' => '🚪 Закрыть обращение',
-    'message_close_topic' => 'Ваше обращение закрыто!',
 
     'but_request_phone' => '📱 Поделиться номером телефона',
     'request_phone_message' => 'Пожалуйста, поделитесь своим номером телефона для более быстрой связи.',

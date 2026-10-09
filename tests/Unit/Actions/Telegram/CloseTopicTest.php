@@ -8,6 +8,7 @@ use App\Jobs\SendTelegramSimpleQueryJob;
 use App\Models\BotUser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class CloseTopicTest extends TestCase
@@ -20,87 +21,48 @@ class CloseTopicTest extends TestCase
     {
         parent::setUp();
 
-        $this->groupId = time();
+        $this->groupId = -1001234567890;
         config(['traffic_source.settings.telegram.group_id' => $this->groupId]);
 
         Queue::fake();
     }
 
-    public function test_close_topic_other_platform(): void
+    public static function platforms(): array
     {
-        $chatId = time();
-        $botUser = BotUser::getUserByChatId($chatId, 'test');
-
-        (new CloseTopic())->execute($botUser);
-
-        /** @phpstan-ignore-next-line */
-        $pushed = Queue::pushedJobs()[SendTelegramSimpleQueryJob::class] ?? [];
-        $this->assertCount(2, $pushed);
-
-        $job = $pushed[0]['job'];
-        $this->assertEquals('editForumTopic', $job->queryParams->methodQuery);
-        $this->assertEquals($this->groupId, $job->queryParams->chat_id);
-        $this->assertEquals($botUser->topic_id, $job->queryParams->message_thread_id);
-
-        $job = $pushed[1]['job'];
-        $this->assertEquals('closeForumTopic', $job->queryParams->methodQuery);
-        $this->assertEquals($this->groupId, $job->queryParams->chat_id);
-        $this->assertEquals($botUser->topic_id, $job->queryParams->message_thread_id);
+        return [['telegram'], ['vk'], ['test']];
     }
 
-    public function test_close_topic_telegram(): void
+    #[DataProvider('platforms')]
+    public function test_close_topic_sets_icon_and_closes_without_telling_the_client(string $platform): void
     {
-        $chatId = time();
-        $botUser = BotUser::getUserByChatId($chatId, 'telegram');
+        $botUser = BotUser::create(['chat_id' => random_int(1, 2_000_000_000), 'platform' => $platform, 'topic_id' => 4242]);
 
         (new CloseTopic())->execute($botUser);
 
         /** @phpstan-ignore-next-line */
         $pushed = Queue::pushedJobs()[SendTelegramSimpleQueryJob::class] ?? [];
-        $this->assertCount(3, $pushed);
+        $methods = array_map(fn ($job) => $job['job']->queryParams->methodQuery, $pushed);
 
-        $job = $pushed[0]['job'];
-        $this->assertEquals('sendMessage', $job->queryParams->methodQuery);
-        $this->assertEquals($botUser->chat_id, $job->queryParams->chat_id);
+        // Только служебные действия в группе: значок и закрытие темы, клиенту сообщений нет
+        $this->assertSame(['editForumTopic', 'closeForumTopic'], $methods);
+        foreach ($pushed as $job) {
+            $this->assertEquals($this->groupId, $job['job']->queryParams->chat_id);
+            $this->assertEquals(4242, $job['job']->queryParams->message_thread_id);
+        }
 
-        $job = $pushed[1]['job'];
-        $this->assertEquals('editForumTopic', $job->queryParams->methodQuery);
-        $this->assertEquals($this->groupId, $job->queryParams->chat_id);
-        $this->assertEquals($botUser->topic_id, $job->queryParams->message_thread_id);
+        /** @phpstan-ignore-next-line */
+        $this->assertEmpty(Queue::pushedJobs()[SendVkSimpleMessageJob::class] ?? []);
 
-        $job = $pushed[2]['job'];
-        $this->assertEquals('closeForumTopic', $job->queryParams->methodQuery);
-        $this->assertEquals($this->groupId, $job->queryParams->chat_id);
-        $this->assertEquals($botUser->topic_id, $job->queryParams->message_thread_id);
+        $this->assertNotNull($botUser->fresh()->topic_closed_at);
     }
 
-    public function test_close_topic_vk(): void
+    public function test_close_topic_without_topic_does_nothing(): void
     {
-        $chatId = time();
-        $botUser = BotUser::getUserByChatId($chatId, 'vk');
+        $botUser = BotUser::create(['chat_id' => random_int(1, 2_000_000_000), 'platform' => 'telegram']);
 
         (new CloseTopic())->execute($botUser);
 
         /** @phpstan-ignore-next-line */
-        $pushed = Queue::pushedJobs()[SendVkSimpleMessageJob::class] ?? [];
-        $this->assertCount(1, $pushed);
-
-        $job = $pushed[0]['job'];
-        $this->assertEquals('messages.send', $job->queryParams->methodQuery);
-        $this->assertEquals($botUser->chat_id, $job->queryParams->peer_id);
-
-        /** @phpstan-ignore-next-line */
-        $pushed = Queue::pushedJobs()[SendTelegramSimpleQueryJob::class] ?? [];
-        $this->assertCount(2, $pushed);
-
-        $job = $pushed[0]['job'];
-        $this->assertEquals('editForumTopic', $job->queryParams->methodQuery);
-        $this->assertEquals($this->groupId, $job->queryParams->chat_id);
-        $this->assertEquals($botUser->topic_id, $job->queryParams->message_thread_id);
-
-        $job = $pushed[1]['job'];
-        $this->assertEquals('closeForumTopic', $job->queryParams->methodQuery);
-        $this->assertEquals($this->groupId, $job->queryParams->chat_id);
-        $this->assertEquals($botUser->topic_id, $job->queryParams->message_thread_id);
+        $this->assertEmpty(Queue::pushedJobs());
     }
 }
