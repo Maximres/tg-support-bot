@@ -153,7 +153,7 @@ class TenantFlowTest extends TestCase
         // «123» — не ФИО: регистрация не двигается дальше, клиент получает подсказку
         $this->assertTrue($flow->execute($this->privateDto('123'), $botUser->fresh()));
         $this->assertEmpty($botUser->fresh()->full_name);
-        $this->assertSame(1, $this->sentCount('sendMessage', fn ($r) => str_contains($r['text'] ?? '', 'укажите ФИО полностью')));
+        $this->assertSame(1, $this->sentCount('sendMessage', fn ($r) => str_contains($r['text'] ?? '', 'укажите только ФИО')));
 
         $this->assertTrue($flow->execute($this->privateDto('Иванов Иван Иванович'), $botUser->fresh()));
         $this->assertTrue($flow->execute($this->privateDto('+375291234567'), $botUser->fresh()));
