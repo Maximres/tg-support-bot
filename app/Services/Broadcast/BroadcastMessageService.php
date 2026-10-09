@@ -189,6 +189,9 @@ class BroadcastMessageService
         } elseif (!empty($message['video_note'])) {
             $methodQuery = 'sendVideoNote';
             $params['video_note'] = $message['video_note']['file_id'] ?? null;
+        } elseif (!empty($message['sticker'])) {
+            $methodQuery = 'sendSticker';
+            $params['sticker'] = $message['sticker']['file_id'] ?? null;
         } elseif (!empty($update->text)) {
             $methodQuery = 'sendMessage';
             $params['text'] = $update->text;

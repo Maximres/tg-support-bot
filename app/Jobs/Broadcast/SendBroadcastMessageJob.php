@@ -126,7 +126,7 @@ class SendBroadcastMessageJob implements ShouldQueue
 
         // ✅ 400 - file not found или file is too big
         if ($response->response_code === 400) {
-            $errorDescription = $response->description ?? '';
+            $errorDescription = $response->rawData['description'] ?? '';
             if (str_contains($errorDescription, 'file not found') || 
                 str_contains($errorDescription, 'file is too big') ||
                 str_contains($errorDescription, 'Bad Request: file')) {
@@ -154,7 +154,7 @@ class SendBroadcastMessageJob implements ShouldQueue
 
         // ✅ 400 - chat not found
         if ($response->response_code === 400 && 
-            ($response->type_error === 'CHAT_NOT_FOUND' || str_contains($response->description ?? '', 'chat not found'))) {
+            ($response->type_error === 'CHAT_NOT_FOUND' || str_contains($response->rawData['description'] ?? '', 'chat not found'))) {
             Log::warning('SendBroadcastMessageJob: чат не найден', [
                 'bot_user_id' => $this->botUserId,
                 'chat_id' => $botUser->chat_id,
@@ -168,7 +168,7 @@ class SendBroadcastMessageJob implements ShouldQueue
             'chat_id' => $botUser->chat_id,
             'response_code' => $response->response_code ?? null,
             'type_error' => $response->type_error ?? null,
-            'description' => $response->description ?? null,
+            'description' => $response->rawData['description'] ?? null,
             'response' => $response->rawData ?? null,
         ]);
     }
