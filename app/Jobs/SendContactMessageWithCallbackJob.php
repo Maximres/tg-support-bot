@@ -62,7 +62,8 @@ class SendContactMessageWithCallbackJob implements ShouldQueue
                     ->where('message_type', 'incoming')
                     ->exists();
 
-                if (!$hasIncomingMessages && !empty($botUser->topic_id)) {
+                // Клиенту с открытым доступом значок 💬 не ставим: мы уже ответили и ждём его сообщения
+                if (!$hasIncomingMessages && !$botUser->isTrusted() && !empty($botUser->topic_id)) {
                     $iconIncoming = __('icons.incoming');
                     if (!empty($iconIncoming)) {
                         // Устанавливаем иконку 'incoming' с небольшой задержкой

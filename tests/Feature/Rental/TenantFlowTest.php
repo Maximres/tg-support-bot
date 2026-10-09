@@ -218,8 +218,11 @@ class TenantFlowTest extends TestCase
         (new ShowRentalMaterial())->showLink($this->callbackDto('link_show_keys'), $botUser, 'keys');
         $this->assertSame($before, $linksSent());
 
-        // 10a. Админ открывает доступ: меню у клиента правится на месте и появляется уведомление
+        // 10a. Админ открывает доступ: меню у клиента правится на месте и появляется уведомление,
+        // а значок темы становится ✅ (клиент ещё не писал — мы ждём его сообщения)
         (new TrustContactMessage())->execute($botUser, true);
+
+        $this->assertSame(1, $this->sentCount('editForumTopic', fn ($r) => $r['icon_custom_emoji_id'] === __('icons.outgoing')));
 
         $this->assertSame(1, $this->sentCount('editMessageText', fn ($r) => str_contains($this->markup($r), 'link_show_hub')));
         $this->assertSame(1, $this->sentCount('sendMessage', fn ($r) => str_contains($r['text'] ?? '', 'открыт доступ')));

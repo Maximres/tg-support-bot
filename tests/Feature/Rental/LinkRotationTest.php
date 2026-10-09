@@ -6,10 +6,12 @@ use App\Actions\Telegram\BannedContactMessage;
 use App\Actions\Telegram\RefreshAccessMessage;
 use App\Actions\Telegram\SendAccessMessage;
 use App\Actions\Telegram\SetRentalLink;
+use App\Actions\Telegram\TrustContactMessage;
 use App\Actions\Telegram\ShowRentalMaterial;
 use App\DTOs\TelegramUpdateDto;
 use App\Models\BotSetting;
 use App\Models\BotUser;
+use App\Models\Message;
 use App\Services\Rental\RentalLinks;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -292,6 +294,27 @@ class LinkRotationTest extends TestCase
 
         $this->assertSame(1, $this->sentCount('deleteMessage', fn ($r) => (int)$r['message_id'] === 356));
         $this->assertNotSame(356, (int)$botUser->fresh()->access_message_id);
+    }
+
+    // ---- значок темы при открытии доступа
+
+    public function test_granting_access_to_a_new_client_sets_the_waiting_icon(): void
+    {
+        $botUser = $this->makeBotUser(['is_trusted' => false, 'topic_id' => 4242]);
+
+        (new TrustContactMessage())->execute($botUser, true);
+
+        $this->assertSame(1, $this->sentCount('editForumTopic', fn ($r) => $r['icon_custom_emoji_id'] === __('icons.outgoing') && (int)$r['message_thread_id'] === 4242));
+    }
+
+    public function test_granting_access_keeps_the_icon_when_the_client_is_waiting_for_a_reply(): void
+    {
+        $botUser = $this->makeBotUser(['is_trusted' => false, 'topic_id' => 4242]);
+        Message::create(['bot_user_id' => $botUser->id, 'platform' => 'telegram', 'message_type' => 'incoming', 'from_id' => 1, 'to_id' => 2]);
+
+        (new TrustContactMessage())->execute($botUser, true);
+
+        $this->assertSame(0, $this->sentCount('editForumTopic'));
     }
 
     // ---- блокировка
