@@ -94,17 +94,13 @@ class SendAccessMessage
             }
         };
 
-        // Порядок: сверху описание кабинетов, затем открытые всем пункты (правила, как добраться, договор),
-        // после них — остальные материалы
+        // Порядок: сверху описание кабинетов, затем открытые всем пункты (правила, как добраться),
+        // после них — остальные материалы, в самом конце договор
         if (SafeCode::current(SafeCodeType::ORG_LINK)) {
             $buttons[] = ['text' => SafeCodeType::ORG_LINK->buttonLabel(), 'callback_data' => SafeCodeType::ORG_LINK->callbackData()];
         }
 
         $linkButton('map');
-
-        if (!empty(OfferDocument::fileId())) {
-            $buttons[] = ['text' => __('messages.but_menu_offer'), 'callback_data' => 'offer_show'];
-        }
 
         if ($hasAccess) {
             foreach (['hub', 'schedule', 'payment', 'wifi', 'keys'] as $key) {
@@ -114,6 +110,11 @@ class SendAccessMessage
             foreach ([SafeCodeType::SAFE, SafeCodeType::BUILDING] as $type) {
                 $buttons[] = ['text' => $type->buttonLabel(), 'callback_data' => $type->callbackData()];
             }
+        }
+
+        // Договор всегда последний
+        if (!empty(OfferDocument::fileId())) {
+            $buttons[] = ['text' => __('messages.but_menu_offer'), 'callback_data' => 'offer_show'];
         }
 
         $keyboard = [];

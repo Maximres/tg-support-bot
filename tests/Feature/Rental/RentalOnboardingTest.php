@@ -208,15 +208,18 @@ class RentalOnboardingTest extends TestCase
         $keyboard = (new SendAccessMessage())->getKeyboard(true);
         $flat = json_encode($keyboard, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-        // Порядок: описание кабинетов сверху, затем правила, как добраться, договор, потом остальное
+        // Порядок: описание кабинетов сверху, затем правила, как добраться, потом остальное, договор в конце
         $this->assertCount(1, $keyboard[0]);
         $this->assertSame('🏠 Описание кабинетов', $keyboard[0][0]['text']);
         $this->assertSame('link_show_cabinets', $keyboard[0][0]['callback_data']);
         $this->assertSame('📋 Правила', $keyboard[1][0]['text']);
-        // (карта в этой конфигурации не задана, поэтому договор идёт сразу за правилами)
-        $this->assertSame('offer_show', $keyboard[1][1]['callback_data']);
-        $this->assertSame('📋 Все инструкции', $keyboard[2][0]['text']);
-        $this->assertSame('link_show_hub', $keyboard[2][0]['callback_data']);
+        // (карта в этой конфигурации не задана, поэтому после правил сразу идут остальные материалы)
+        $this->assertSame('📋 Все инструкции', $keyboard[1][1]['text']);
+        $this->assertSame('link_show_hub', $keyboard[1][1]['callback_data']);
+
+        // Договор — последний
+        $last = end($keyboard);
+        $this->assertSame('offer_show', end($last)['callback_data']);
 
         foreach (['link_show_cabinets', 'link_show_wifi', 'link_show_schedule', 'link_show_keys', 'access_show_safe', 'access_show_building', 'access_show_org_link', 'offer_show'] as $callback) {
             $this->assertStringContainsString($callback, $flat);
