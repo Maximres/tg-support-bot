@@ -94,26 +94,26 @@ class SendAccessMessage
             }
         };
 
-        if ($hasAccess) {
-            $linkButton('hub');
-        }
-
+        // Порядок: сверху описание кабинетов, затем открытые всем пункты (правила, как добраться, договор),
+        // после них — остальные материалы
         if (SafeCode::current(SafeCodeType::ORG_LINK)) {
             $buttons[] = ['text' => SafeCodeType::ORG_LINK->buttonLabel(), 'callback_data' => SafeCodeType::ORG_LINK->callbackData()];
         }
 
-        foreach (['map', 'schedule', 'payment', 'wifi', 'keys'] as $key) {
-            $linkButton($key);
-        }
-
-        if ($hasAccess) {
-            foreach ([SafeCodeType::SAFE, SafeCodeType::BUILDING] as $type) {
-                $buttons[] = ['text' => $type->buttonLabel(), 'callback_data' => $type->callbackData()];
-            }
-        }
+        $linkButton('map');
 
         if (!empty(OfferDocument::fileId())) {
             $buttons[] = ['text' => __('messages.but_menu_offer'), 'callback_data' => 'offer_show'];
+        }
+
+        if ($hasAccess) {
+            foreach (['hub', 'schedule', 'payment', 'wifi', 'keys'] as $key) {
+                $linkButton($key);
+            }
+
+            foreach ([SafeCodeType::SAFE, SafeCodeType::BUILDING] as $type) {
+                $buttons[] = ['text' => $type->buttonLabel(), 'callback_data' => $type->callbackData()];
+            }
         }
 
         $keyboard = [];
