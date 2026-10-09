@@ -195,7 +195,7 @@ class TenantFlowTest extends TestCase
 
         $this->assertTrue($botUser->hasAcceptedOffer());
         $this->assertNotNull($botUser->access_message_id);
-        $this->assertSame(1, $this->sentCount('pinChatMessage'));
+        $this->assertSame(1, $this->sentCount('pinChatMessage', fn ($r) => (int)$r['chat_id'] > 0));
         $this->assertSame(1, $this->sentCount('sendMessage', fn ($r) => str_contains($r['text'] ?? '', 'Договор-оферта принят') && str_contains($r['text'] ?? '', '+375291071837')));
         $this->assertSame(1, $this->sentCount('sendMessage', fn ($r) => (int)($r['chat_id'] ?? 0) === self::CHAT_ID && !str_contains($r['text'] ?? '', 'Регистрация') && !str_contains($r['text'] ?? '', 'ФИО') && !str_contains($r['text'] ?? '', 'телефон') && !str_contains($r['text'] ?? '', 'email') && !str_contains($r['text'] ?? '', 'эмейл')));
 
@@ -292,7 +292,7 @@ class TenantFlowTest extends TestCase
         $this->assertTrue($botUser->hasAcceptedOffer());
         $this->assertNotSame(356, (int)$botUser->access_message_id);
         $this->assertSame(1, $this->sentCount('unpinChatMessage', fn ($r) => (int)$r['message_id'] === 356));
-        $this->assertSame(1, $this->sentCount('pinChatMessage'));
+        $this->assertSame(1, $this->sentCount('pinChatMessage', fn ($r) => (int)$r['chat_id'] > 0));
 
         // Старое сообщение удалено, а новое меню без доступа содержит только договор
         $this->assertSame(1, $this->sentCount('deleteMessage', fn ($r) => (int)$r['message_id'] === 356));

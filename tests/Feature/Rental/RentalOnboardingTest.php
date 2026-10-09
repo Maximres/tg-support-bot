@@ -141,7 +141,11 @@ class RentalOnboardingTest extends TestCase
 
         (new AcceptOffer())->execute($dto, $botUser->fresh());
 
-        $this->assertSame(1, $this->sentCount('pinChatMessage'));
+        // Закрепляется только меню в чате клиента (карточка в группе — отдельное закрепление)
+        $this->assertSame(1, count(array_filter(
+            Http::recorded()->all(),
+            fn ($pair) => str_contains($pair[0]->url(), 'pinChatMessage') && (int)$pair[0]['chat_id'] > 0
+        )));
         $this->assertEquals($firstAcceptedAt, $botUser->fresh()->offer_accepted_at);
     }
 
