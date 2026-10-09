@@ -10,7 +10,6 @@ use App\Enums\SafeCodeType;
 use App\Models\BotSetting;
 use App\Models\BotUser;
 use App\Models\SafeCode;
-use App\Services\Rental\RotationNotifier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -133,7 +132,7 @@ class SafeCodeAccessFlowTest extends TestCase
         $this->assertEmpty(Http::recorded());
     }
 
-    public function test_admin_can_set_both_codes_and_only_trusted_users_are_notified(): void
+    public function test_admin_can_set_both_codes_without_notifying_clients(): void
     {
         $this->chatMemberStatus = 'administrator';
 
@@ -146,25 +145,8 @@ class SafeCodeAccessFlowTest extends TestCase
         $this->assertSame('1234', SafeCode::current(SafeCodeType::SAFE)->code);
         $this->assertSame('5678', SafeCode::current(SafeCodeType::BUILDING)->code);
 
-        // Сразу ничего не уходит: изменения копятся и отправляются одним сообщением после паузы
+        // Замена кодов клиентам не рассылается: актуальное значение они получают по нажатию кнопки
         Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'sendMessage') && ($r['chat_id'] ?? null) == $trusted->chat_id);
-
-        // Пауза без новых замен: сдвигаем метку последней замены в прошлое
-        BotSetting::set('rotation.last_at', (string)(time() - RotationNotifier::QUIET_SECONDS - 5));
-        (new RotationNotifier())->flushIfQuiet();
-
-        $summaries = array_filter(
-            Http::recorded()->all(),
-            fn ($pair) => str_contains($pair[0]->url(), 'sendMessage') && ($pair[0]['chat_id'] ?? null) == $trusted->chat_id
-        );
-        $this->assertCount(1, $summaries);
-
-        $text = array_values($summaries)[0][0]['text'];
-        $this->assertStringContainsString('Код от сейфа', $text);
-        $this->assertStringContainsString('Код от здания', $text);
-        $this->assertStringNotContainsString('1234', $text);
-        $this->assertStringNotContainsString('5678', $text);
-
         Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'sendMessage') && ($r['chat_id'] ?? null) == $untrusted->chat_id);
     }
 

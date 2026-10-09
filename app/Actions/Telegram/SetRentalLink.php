@@ -6,7 +6,6 @@ use App\DTOs\TelegramUpdateDto;
 use App\DTOs\TGTextMessageDto;
 use App\Jobs\SendTelegramSimpleQueryJob;
 use App\Logging\LokiLogger;
-use App\Services\Rental\RotationNotifier;
 use App\Services\Rental\RentalLinks;
 use Illuminate\Support\Facades\Log;
 
@@ -66,7 +65,6 @@ class SetRentalLink
             Log::info('SetRentalLink: ссылка заменена', ['key' => $key, 'set_by_user_id' => $update->fromUserId]);
 
             $this->reply($groupId, $update->messageThreadId, __('messages.set_link.saved', ['title' => RentalLinks::title($key)]));
-            $this->notifyTrustedUsers($key);
         } catch (\Throwable $e) {
             (new LokiLogger())->logException($e);
             Log::error('SetRentalLink: неожиданная ошибка', ['error' => $e->getMessage()]);
@@ -89,18 +87,6 @@ class SetRentalLink
         $parts = preg_split('/\s+/u', $rest, 2);
 
         return [$parts[0], trim($parts[1] ?? '')];
-    }
-
-    /**
-     * Сводное уведомление доверенным уходит позже, одним сообщением (RotationNotifier)
-     *
-     * @param string $key
-     *
-     * @return void
-     */
-    private function notifyTrustedUsers(string $key): void
-    {
-        RotationNotifier::record(RentalLinks::title($key));
     }
 
     /**

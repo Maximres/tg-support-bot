@@ -11,7 +11,6 @@ use App\DTOs\TelegramUpdateDto;
 use App\Models\BotSetting;
 use App\Models\BotUser;
 use App\Services\Rental\RentalLinks;
-use App\Services\Rental\RotationNotifier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -20,7 +19,7 @@ use Tests\Mocks\Tg\TelegramUpdate_SafeCodeButtonMock;
 use Tests\TestCase;
 
 /**
- * Ротация ссылок: выдача по нажатию, команда /set_link, обновление меню и сводное уведомление
+ * Ротация ссылок: выдача по нажатию, команда /set_link и обновление меню
  */
 class LinkRotationTest extends TestCase
 {
@@ -213,7 +212,6 @@ class LinkRotationTest extends TestCase
         (new SetRentalLink())->execute($this->groupCommand('/set_link график https://example.com/schedule'));
 
         $this->assertSame('https://example.com/schedule', RentalLinks::get('schedule'));
-        $this->assertSame([], json_decode((string)BotSetting::get('rotation.pending', '[]'), true));
     }
 
     public function test_off_hides_the_item_even_if_it_comes_from_env(): void
@@ -226,33 +224,16 @@ class LinkRotationTest extends TestCase
         $this->assertNotContains('link_show_keys', array_column(array_merge(...(new SendAccessMessage())->getKeyboard(true)), 'callback_data'));
     }
 
-    // ---- сводное уведомление
+    // ---- замена ссылки не рассылает клиентам уведомлений
 
-    public function test_rotation_sends_one_summary_to_trusted_users_after_quiet_period(): void
+    public function test_rotation_does_not_notify_clients(): void
     {
         $trusted = $this->makeBotUser(['is_trusted' => true]);
-        $untrusted = $this->makeBotUser(['is_trusted' => false]);
-        $banned = $this->makeBotUser(['is_trusted' => true, 'is_banned' => true]);
 
         (new SetRentalLink())->execute($this->groupCommand('/set_link график https://new.example.com/s'));
         (new SetRentalLink())->execute($this->groupCommand('/set_link wifi https://new.example.com/w'));
 
-        // Только что менялось — ждём
-        (new RotationNotifier())->flushIfQuiet();
         $this->assertSame(0, $this->sentToUser($trusted));
-
-        BotSetting::set('rotation.last_at', (string)(time() - RotationNotifier::QUIET_SECONDS - 5));
-        (new RotationNotifier())->flushIfQuiet();
-
-        $this->assertSame(1, $this->sentToUser($trusted));
-        $this->assertSame(0, $this->sentToUser($untrusted));
-        $this->assertSame(0, $this->sentToUser($banned));
-        $this->assertSame(1, $this->sentCount('sendMessage', fn ($r) => str_contains($r['text'] ?? '', 'График') && str_contains($r['text'] ?? '', 'Wi-Fi')));
-        $this->assertSame(0, $this->sentCount('sendMessage', fn ($r) => str_contains($r['text'] ?? '', 'new.example.com')));
-
-        // Повторный запуск планировщика ничего не отправляет
-        (new RotationNotifier())->flushIfQuiet();
-        $this->assertSame(1, $this->sentToUser($trusted));
     }
 
     // ---- обновление меню

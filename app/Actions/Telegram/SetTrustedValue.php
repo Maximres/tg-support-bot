@@ -9,7 +9,6 @@ use App\Jobs\SendTelegramSimpleQueryJob;
 use App\Logging\LokiLogger;
 use App\Models\BotUser;
 use App\Models\SafeCode;
-use App\Services\Rental\RotationNotifier;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -80,15 +79,12 @@ class SetTrustedValue
 
             if ($type->isUrl()) {
                 $this->reply($groupId, $update->messageThreadId, __('messages.command_set_org_link_saved'));
-                $this->notifyTrustedUsers($type);
                 return;
             }
 
             $this->reply($groupId, $update->messageThreadId, __('messages.command_set_value_saved', [
                 'type' => $type->label(),
             ]));
-
-            $this->notifyTrustedUsers($type);
 
             Log::info('SetTrustedValue: значение обновлено', [
                 'type' => $type->value,
@@ -141,19 +137,6 @@ class SetTrustedValue
         }
 
         return true;
-    }
-
-    /**
-     * Сводное уведомление о ротации уходит доверенным позже одним сообщением (RotationNotifier);
-     * само значение в рассылку не попадает — только по нажатию кнопки
-     *
-     * @param SafeCodeType $type
-     *
-     * @return void
-     */
-    private function notifyTrustedUsers(SafeCodeType $type): void
-    {
-        RotationNotifier::record($type->label());
     }
 
     /**
