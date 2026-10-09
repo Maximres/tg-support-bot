@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Actions\Telegram\PinContactCard;
 use App\DTOs\TGTextMessageDto;
 use App\Jobs\SendTelegramSimpleQueryJob;
 use App\Logging\LokiLogger;
@@ -53,8 +54,12 @@ class SendContactMessageWithCallbackJob implements ShouldQueue
 
             if ($response->ok && isset($response->message_id)) {
                 // Сохраняем message_id в BotUser
+                $previousMessageId = $botUser->contact_info_message_id ? (int)$botUser->contact_info_message_id : null;
                 $botUser->contact_info_message_id = $response->message_id;
                 $botUser->save();
+
+                // Карточка всегда закреплена в теме; если её заменили новым сообщением — старая откреплена
+                (new PinContactCard())->execute($botUser, $previousMessageId);
 
                 // Если от клиента не было сообщений, устанавливаем иконку 'incoming'
                 // (клиент ввел данные и ожидает от нас сообщения)
