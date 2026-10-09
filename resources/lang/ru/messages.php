@@ -30,7 +30,7 @@ return [
     'command_set_link_description' => 'Заменить ссылку меню (использование: /set_link график https://…)',
     'link_titles' => [
         'hub' => 'Все инструкции',
-        'cabinets' => 'Кабинеты',
+        'cabinets' => 'Описание кабинетов',
         'map' => 'Как добраться',
         'schedule' => 'График',
         'payment' => 'Оплата',
@@ -50,7 +50,7 @@ return [
 
     // Меню материалов для арендаторов
     'but_menu_hub' => '📋 Все инструкции',
-    'but_menu_cabinets' => '🏠 Кабинеты',
+    'but_menu_cabinets' => '🏠 Описание кабинетов',
     'but_menu_map' => '🗺 Как добраться',
     'but_menu_schedule' => '📅 График',
     'but_menu_payment' => '💳 Оплата',
@@ -122,7 +122,7 @@ return [
         'rotate_text' => "🔄 <b>Ротация доступов</b>\nВыберите, что заменить: ✅ задано, ➖ не задано. Клиентам с доступом уйдёт одно сводное уведомление.",
         'prompt_link' => '🔗 Ответьте на это сообщение новой ссылкой для пункта «:title» (https://…).',
         'but_link_hub' => '📋 Инструкции',
-        'but_link_cabinets' => '🏠 Кабинеты',
+        'but_link_cabinets' => '🏠 Описание кабинетов',
         'but_link_map' => '🗺 Карта',
         'but_link_schedule' => '📅 График',
         'but_link_payment' => '💳 Оплата',

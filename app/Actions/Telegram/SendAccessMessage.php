@@ -71,7 +71,8 @@ class SendAccessMessage
     /**
      * Кнопки меню. Без доступа — только договор; с доступом — всё остальное.
      * Ссылочные пункты без заданного значения пропускаются.
-     * Первая кнопка (общая страница инструкций) — на всю ширину, остальные — по две в ряд.
+     * Первая кнопка (описание кабинетов) — на всю ширину, остальные — по две в ряд,
+     * начиная с общей страницы инструкций.
      *
      * @param bool $hasAccess
      *
@@ -89,7 +90,7 @@ class SendAccessMessage
 
         $buttons = [];
 
-        foreach (['cabinets', 'map', 'schedule', 'payment', 'wifi', 'keys'] as $key) {
+        foreach (['hub', 'map', 'schedule', 'payment', 'wifi', 'keys'] as $key) {
             if (!empty(RentalLinks::get($key))) {
                 $buttons[] = ['text' => __("messages.but_menu_{$key}"), 'callback_data' => "link_show_{$key}"];
             }
@@ -105,8 +106,8 @@ class SendAccessMessage
 
         $keyboard = [];
 
-        if (!empty(RentalLinks::get('hub'))) {
-            $keyboard[] = [['text' => __('messages.but_menu_hub'), 'callback_data' => 'link_show_hub']];
+        if (!empty(RentalLinks::get('cabinets'))) {
+            $keyboard[] = [['text' => __('messages.but_menu_cabinets'), 'callback_data' => 'link_show_cabinets']];
         }
 
         return array_merge($keyboard, array_chunk($buttons, 2));

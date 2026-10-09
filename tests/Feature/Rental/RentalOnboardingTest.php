@@ -182,9 +182,12 @@ class RentalOnboardingTest extends TestCase
         $keyboard = (new SendAccessMessage())->getKeyboard(true);
         $flat = json_encode($keyboard, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-        // Общая страница инструкций — отдельной строкой сверху
+        // Описание кабинетов — отдельной строкой сверху, общая страница инструкций — первая в сетке
         $this->assertCount(1, $keyboard[0]);
-        $this->assertSame('link_show_hub', $keyboard[0][0]['callback_data']);
+        $this->assertSame('link_show_cabinets', $keyboard[0][0]['callback_data']);
+        $this->assertSame('📋 Все инструкции', $keyboard[1][0]['text']);
+        $this->assertSame('link_show_hub', $keyboard[1][0]['callback_data']);
+        $this->assertSame('🏠 Описание кабинетов', $keyboard[0][0]['text']);
 
         foreach (['link_show_cabinets', 'link_show_wifi', 'link_show_schedule', 'link_show_keys', 'access_show_safe', 'access_show_building', 'access_show_org_link', 'offer_show'] as $callback) {
             $this->assertStringContainsString($callback, $flat);
