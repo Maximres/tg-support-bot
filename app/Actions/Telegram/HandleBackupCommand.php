@@ -162,9 +162,7 @@ class HandleBackupCommand
             }
 
             $argument = (string)$fromUserId;
-        }
-
-        if (!DatabaseBackupService::isValidChatId($argument)) {
+        } elseif (!DatabaseBackupService::isValidChatId($argument)) {
             return __('messages.backup.recipient_invalid');
         }
 

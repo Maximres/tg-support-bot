@@ -310,8 +310,13 @@ class BackupTest extends TestCase
 
         $this->command('/backup_now');
 
-        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'sendDocument') && ($r['chat_id'] ?? null) == '987654321');
-        Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'sendDocument') && ($r['chat_id'] ?? null) == '555000');
+        $documentChats = [];
+        foreach (Http::recorded()->all() as [$request]) {
+            if (str_contains($request->url(), 'sendDocument')) {
+                $documentChats[] = collect($request->data())->firstWhere('name', 'chat_id')['contents'];
+            }
+        }
+        $this->assertSame(['987654321'], $documentChats);
     }
 
     public function test_recipient_me_uses_the_sender(): void
