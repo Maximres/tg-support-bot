@@ -98,6 +98,19 @@ class SendTelegramMessageJob extends AbstractSendMessageJob
                 $this->queryParams->token
             );
 
+            if ($response->ok !== true && $this->isMarkdownError($response)) {
+                Log::warning('MARKDOWN_ERROR → повторяем отправку без форматирования', [
+                    'bot_user_id' => $this->botUserId,
+                    'method' => $methodQuery,
+                ]);
+
+                $response = $this->telegramMethods->sendQueryTelegram(
+                    $methodQuery,
+                    $this->withoutFormatting($params),
+                    $this->queryParams->token
+                );
+            }
+
             if ($response->ok === true) {
                 if ($methodQuery !== 'editMessageText' && $methodQuery !== 'editMessageCaption') {
                     $this->saveMessage($botUser, $response);

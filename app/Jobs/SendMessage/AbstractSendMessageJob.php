@@ -85,58 +85,60 @@ abstract class AbstractSendMessageJob implements ShouldQueue
             return;
         }
         
-        // Защита от дублирующих обновлений: используем Redis блокировку
-        // Ключ блокировки: topic_icon_update_{topic_id}
-        $lockKey = 'topic_icon_update_' . $botUser->topic_id;
-        $lockTimeout = 5; // секунды
-        
-        // Пытаемся получить блокировку
-        $lock = \Illuminate\Support\Facades\Cache::lock($lockKey, $lockTimeout);
-        
-        if (!$lock->get()) {
-            // Блокировка уже установлена другим процессом - пропускаем обновление
-            Log::debug('updateTopic: пропускаем обновление, так как уже есть активное обновление', [
-                'bot_user_id' => $botUser->id ?? null,
-                'topic_id' => $botUser->topic_id,
-                'type_message' => $typeMessage,
-                'target_icon' => $targetIcon,
-            ]);
-            return;
-        }
-        
-        try {
-            // Добавляем небольшую задержку перед обновлением иконки для предотвращения race conditions
-            // Это помогает избежать конфликтов при параллельных обновлениях
-            $params = [
-                'methodQuery' => 'editForumTopic',
-                'chat_id' => config('traffic_source.settings.telegram.group_id'),
-                'message_thread_id' => $botUser->topic_id,
-                'icon_custom_emoji_id' => $targetIcon,
-            ];
+        // Повторные обновления безвредны: если значок уже нужный, Telegram ответит TOPIC_NOT_MODIFIED,
+        // а SendTelegramSimpleQueryJob считает это успехом. Блокировки не нужны — из-за них смена значка
+        // в течение нескольких секунд после предыдущей молча пропускалась.
+        SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from([
+            'methodQuery' => 'editForumTopic',
+            'chat_id' => config('traffic_source.settings.telegram.group_id'),
+            'message_thread_id' => $botUser->topic_id,
+            'icon_custom_emoji_id' => $targetIcon,
+        ]));
 
-            // Не обновляем название, если оно было изменено вручную
-            if (!$botUser->hasCustomTopicName()) {
-                // Можно добавить обновление названия здесь, если нужно
-                // Но по умолчанию обновляем только иконку
+        Log::debug('updateTopic: запланировано обновление иконки', [
+            'bot_user_id' => $botUser->id ?? null,
+            'topic_id' => $botUser->topic_id,
+            'type_message' => $typeMessage,
+            'target_icon' => $targetIcon,
+        ]);
+    }
+
+    /**
+     * Telegram не смог разобрать разметку («can't parse entities»)
+     *
+     * @param TelegramAnswerDto $response
+     *
+     * @return bool
+     */
+    protected function isMarkdownError(TelegramAnswerDto $response): bool
+    {
+        return $response->response_code === 400 && $response->type_error === 'MARKDOWN_ERROR';
+    }
+
+    /**
+     * Параметры для повторной отправки без форматирования: сообщение лучше доставить простым текстом,
+     * чем потерять (очередь синхронная, повторов средствами очереди нет)
+     *
+     * @param array $params
+     *
+     * @return array
+     */
+    protected function withoutFormatting(array $params): array
+    {
+        $isMarkdown = in_array($params['parse_mode'] ?? null, ['MarkdownV2', 'Markdown'], true);
+
+        unset($params['parse_mode']);
+
+        if ($isMarkdown) {
+            // MarkdownV2 экранирует служебные символы обратной косой чертой — в простом тексте она лишняя
+            foreach (['text', 'caption'] as $field) {
+                if (isset($params[$field]) && is_string($params[$field])) {
+                    $params[$field] = preg_replace('/\\\\(.)/us', '$1', $params[$field]);
+                }
             }
-
-            // Добавляем задержку перед отправкой для предотвращения конфликтов
-            // Используем delay() для отложенной отправки
-            // После выполнения джоба блокировка автоматически снимется
-            SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from($params))
-                ->delay(now()->addSeconds(1));
-            
-            Log::debug('updateTopic: запланировано обновление иконки', [
-                'bot_user_id' => $botUser->id ?? null,
-                'topic_id' => $botUser->topic_id,
-                'type_message' => $typeMessage,
-                'target_icon' => $targetIcon,
-            ]);
-        } finally {
-            // Освобождаем блокировку через небольшую задержку, чтобы дать время джобу выполниться
-            // Но не сразу, чтобы предотвратить дублирующие обновления
-            \Illuminate\Support\Facades\Cache::put($lockKey . '_released', true, $lockTimeout);
         }
+
+        return $params;
     }
 
     /**
@@ -242,6 +244,23 @@ abstract class AbstractSendMessageJob implements ShouldQueue
         if ($response->response_code === 403) {
             Log::warning('403 — пользователь заблокировал бота');
             BanMessage::execute($this->botUserId, $this->updateDto);
+            return;
+        }
+
+        // ✅ 400 chat not found — клиент не запускал бота (например, нового бота после смены): ответ ему не доходит
+        if ($response->response_code === 400 && $response->type_error === 'CHAT_NOT_FOUND' && $this->typeMessage === 'outgoing') {
+            $botUser = BotUser::find($this->botUserId);
+
+            if ($botUser && $botUser->topic_id) {
+                SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from([
+                    'methodQuery' => 'sendMessage',
+                    'chat_id' => config('traffic_source.settings.telegram.group_id'),
+                    'message_thread_id' => $botUser->topic_id,
+                    'text' => __('messages.client_not_reachable'),
+                    'parse_mode' => 'html',
+                ]));
+            }
+
             return;
         }
 

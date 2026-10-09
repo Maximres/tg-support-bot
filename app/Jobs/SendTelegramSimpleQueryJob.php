@@ -45,29 +45,20 @@ class SendTelegramSimpleQueryJob implements ShouldQueue
             if (!$response->ok) {
                 // Для editForumTopic обрабатываем специальные случаи
                 if ($methodQuery === 'editForumTopic') {
-                    // TOPIC_NOT_MODIFIED - это не ошибка, топик просто не изменился
-                    // (например, иконка уже null или та же самая)
-                    $errorDescription = $response->description ?? '';
-                    if (str_contains($errorDescription, 'TOPIC_NOT_MODIFIED')) {
+                    $errorDescription = (string)($response->rawData['description'] ?? '');
+
+                    // TOPIC_NOT_MODIFIED - это не ошибка, значок уже нужный
+                    if ($response->type_error === 'TOPIC_NOT_MODIFIED' || str_contains($errorDescription, 'TOPIC_NOT_MODIFIED')) {
                         \Illuminate\Support\Facades\Log::debug('Топик не был изменен (TOPIC_NOT_MODIFIED)', [
                             'method' => $methodQuery,
                             'topic_id' => $params['message_thread_id'] ?? null,
                             'icon' => $params['icon_custom_emoji_id'] ?? null,
                             'name' => $params['name'] ?? null,
                         ]);
-                        
-                        // Освобождаем блокировку, если она была установлена
-                        $topicId = $params['message_thread_id'] ?? null;
-                        if ($topicId) {
-                            $lockKey = 'topic_icon_update_' . $topicId;
-                            \Illuminate\Support\Facades\Cache::forget($lockKey);
-                            \Illuminate\Support\Facades\Cache::forget($lockKey . '_released');
-                        }
-                        
-                        // Возвращаем успех, так как это не ошибка
+
                         return true;
                     }
-                    
+
                     // Для других ошибок логируем предупреждение
                     \Illuminate\Support\Facades\Log::warning('Ошибка обновления иконки топика', [
                         'method' => $methodQuery,
@@ -75,11 +66,10 @@ class SendTelegramSimpleQueryJob implements ShouldQueue
                         'icon' => $params['icon_custom_emoji_id'] ?? null,
                         'response_code' => $response->response_code ?? null,
                         'error' => $response->type_error ?? null,
-                        'description' => $response->description ?? null,
-                        'raw_response' => $response->rawData ?? null,
+                        'description' => $errorDescription,
                     ]);
                 }
-                
+
                 throw new \Exception(json_encode($response->rawData), 1);
             }
 
@@ -92,13 +82,6 @@ class SendTelegramSimpleQueryJob implements ShouldQueue
                     'icon' => $params['icon_custom_emoji_id'] ?? null,
                     'timestamp' => now()->toIso8601String(),
                 ]);
-                
-                // Освобождаем блокировку после успешного обновления
-                if ($topicId) {
-                    $lockKey = 'topic_icon_update_' . $topicId;
-                    \Illuminate\Support\Facades\Cache::forget($lockKey);
-                    \Illuminate\Support\Facades\Cache::forget($lockKey . '_released');
-                }
             }
 
             return true;
