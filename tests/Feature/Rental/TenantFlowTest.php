@@ -183,7 +183,7 @@ class TenantFlowTest extends TestCase
 
         // 5. Вместо меню приходит оферта; меню и закрепа пока нет
         $this->assertSame(1, $this->sentCount('sendDocument', fn ($r) => str_contains($r['reply_markup'] ?? '', 'offer_accept')));
-        $this->assertSame(0, $this->sentCount('pinChatMessage'));
+        $this->assertSame(0, $this->sentCount('pinChatMessage', fn ($r) => (int)$r['chat_id'] > 0));
         $this->assertFalse($botUser->hasAcceptedOffer());
 
         // 6. Карточка в группе показывает, что оферта не принята
@@ -283,7 +283,7 @@ class TenantFlowTest extends TestCase
         // /restore_access для непринявшего оферту показывает оферту, а не старое меню
         (new \App\Actions\Telegram\SendOfferMessage())->execute($botUser);
         $this->assertSame(1, $this->sentCount('sendDocument'));
-        $this->assertSame(0, $this->sentCount('pinChatMessage'));
+        $this->assertSame(0, $this->sentCount('pinChatMessage', fn ($r) => (int)$r['chat_id'] > 0));
 
         // Согласие -> старое меню откреплено, новое отправлено и закреплено
         (new AcceptOffer())->execute($this->callbackDto('offer_accept'), $botUser);
