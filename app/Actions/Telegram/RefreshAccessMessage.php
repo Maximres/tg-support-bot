@@ -48,6 +48,15 @@ class RefreshAccessMessage
                 'text' => $botUser->isTrusted() ? __('messages.access_granted_notice') : __('messages.access_revoked_notice'),
                 'parse_mode' => 'html',
             ]));
+
+            if ($botUser->isTrusted()) {
+                SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from([
+                    'methodQuery' => 'sendMessage',
+                    'chat_id' => $botUser->chat_id,
+                    'text' => __('messages.access_granted_help'),
+                    'parse_mode' => 'html',
+                ]));
+            }
         }
 
         return $refreshed;

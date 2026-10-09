@@ -15,9 +15,18 @@ class DataValidator
     private const MIN_FULL_NAME_LENGTH = 3;
 
     /**
-     * Минимальное число слов в ФИО (фамилия и имя)
+     * Число слов в ФИО: фамилия, имя и отчество
      */
-    private const MIN_FULL_NAME_WORDS = 2;
+    private const FULL_NAME_WORDS = 3;
+
+    /**
+     * Общее число цифр (вместе с кодом страны) для стран, где длина номера строго известна
+     */
+    private const PHONE_LENGTH_BY_COUNTRY = [
+        '375' => ['digits' => 12, 'example' => '+375291234567'],
+        '380' => ['digits' => 12, 'example' => '+380501234567'],
+        '7' => ['digits' => 11, 'example' => '+79123456789'],
+    ];
 
     /**
      * Максимальная длина ФИО
@@ -65,13 +74,13 @@ class DataValidator
             ];
         }
 
-        // ФИО — только буквы (допустимы пробел, дефис, апостроф, точка) и минимум два слова:
-        // «123», «Максим» и подобное не считаем полным ФИО
+        // ФИО — только буквы (допустимы пробел, дефис, апостроф, точка) и ровно три слова
+        // (фамилия, имя, отчество): «123», «Максим», «Иванов Иван» и подобное не считаем полным ФИО
         $words = preg_split('/\s+/u', $normalized, -1, PREG_SPLIT_NO_EMPTY);
 
         if (preg_match('/[^\p{L}\s\-.\']/u', $normalized)
             || !preg_match('/\p{L}/u', $normalized)
-            || count($words) < self::MIN_FULL_NAME_WORDS) {
+            || count($words) !== self::FULL_NAME_WORDS) {
             return [
                 'valid' => false,
                 'error' => __('messages.registration.validation.full_name_invalid'),
@@ -159,6 +168,21 @@ class DataValidator
                 'error' => __('messages.registration.validation.phone_invalid'),
                 'normalized' => null,
             ];
+        }
+
+        // Для стран с известной длиной номера проверяем её строго: лишняя или пропущенная цифра — опечатка
+        foreach (self::PHONE_LENGTH_BY_COUNTRY as $code => $rule) {
+            if (str_starts_with($digitsOnly, (string)$code) && strlen($digitsOnly) !== $rule['digits']) {
+                return [
+                    'valid' => false,
+                    'error' => __('messages.registration.validation.phone_invalid_length', [
+                        'code' => $code,
+                        'digits' => $rule['digits'],
+                        'example' => $rule['example'],
+                    ]),
+                    'normalized' => null,
+                ];
+            }
         }
 
         return [

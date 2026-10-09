@@ -246,7 +246,10 @@ class LinkRotationTest extends TestCase
 
         $this->assertSame(1, $this->sentCount('editMessageText', fn ($r) => (int)$r['message_id'] === 555 && str_contains($this->markup($r), 'link_show_hub')));
         $this->assertSame(0, $this->sentCount('pinChatMessage'));
-        $this->assertSame(1, $this->sentToUser($botUser));
+
+        // Уведомление об открытии доступа и вторым сообщением — напоминание, куда писать вопросы
+        $this->assertSame(2, $this->sentToUser($botUser));
+        $this->assertSame(1, $this->sentCount('sendMessage', fn ($r) => str_contains($r['text'] ?? '', 'любой формат сообщений')));
     }
 
     public function test_refresh_treats_not_modified_as_success(): void
