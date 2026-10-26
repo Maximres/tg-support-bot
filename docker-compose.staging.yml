@@ -64,7 +64,7 @@ services:
       sh -c "composer install --no-interaction --prefer-dist --no-scripts &&
              php artisan migrate --force &&
              php artisan telegram:set-commands || true;
-             php artisan serve --host=0.0.0.0 --port=8000"
+             php artisan serve --host=0.0.0.0 --port=8000 --no-reload"
     ports:
       - "8088:8000"
     healthcheck:

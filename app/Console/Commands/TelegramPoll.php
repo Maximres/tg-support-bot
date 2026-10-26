@@ -56,9 +56,10 @@ class TelegramPoll extends Command
         do {
             $updates = $this->getUpdates($token, $offset, $timeout);
 
-            foreach ($updates as $update) {
-                $this->forward($target, $secret, $update);
-                $offset = (int)$update['update_id'] + 1;
+            foreach ($this->groupAlbums($updates) as $group) {
+                $this->forward($target, $secret, $group);
+
+                $offset = (int)end($group)['update_id'] + 1;
                 $this->saveOffset($offset);
             }
         } while (!$this->option('once'));
@@ -131,22 +132,60 @@ class TelegramPoll extends Command
     }
 
     /**
+     * Подряд идущие части одного альбома объединяются в группу: на проде Telegram доставляет их параллельно,
+     * и обработчик рассылки рассчитывает, что все части придут почти одновременно
+     *
+     * @param array $updates
+     *
+     * @return array[] Группы обновлений (обычно по одному)
+     */
+    private function groupAlbums(array $updates): array
+    {
+        $groups = [];
+
+        foreach ($updates as $update) {
+            $albumId = $update['message']['media_group_id'] ?? null;
+            $lastIndex = array_key_last($groups);
+
+            if ($albumId !== null && $lastIndex !== null
+                && ($groups[$lastIndex][0]['message']['media_group_id'] ?? null) === $albumId) {
+                $groups[$lastIndex][] = $update;
+                continue;
+            }
+
+            $groups[] = [$update];
+        }
+
+        return $groups;
+    }
+
+    /**
      * @param string $target
      * @param string $secret
-     * @param array  $update
+     * @param array  $group Одно обновление или части одного альбома
      *
      * @return void
      */
-    private function forward(string $target, string $secret, array $update): void
+    private function forward(string $target, string $secret, array $group): void
     {
         try {
-            $response = Http::timeout(120)
-                ->withHeaders(['X-Telegram-Bot-Api-Secret-Token' => $secret])
-                ->post($target, $update);
+            $responses = Http::pool(fn ($pool) => array_map(
+                fn ($update) => $pool->timeout(120)->withHeaders(['X-Telegram-Bot-Api-Secret-Token' => $secret])->post($target, $update),
+                $group
+            ));
 
-            $this->line(sprintf('update %d -> HTTP %d', $update['update_id'] ?? 0, $response->status()));
+            foreach ($group as $i => $update) {
+                $response = $responses[$i];
+
+                if ($response instanceof \Throwable) {
+                    $this->error('Не удалось передать обновление ' . ($update['update_id'] ?? '?') . ': ' . $response->getMessage());
+                    continue;
+                }
+
+                $this->line(sprintf('update %d -> HTTP %d', $update['update_id'] ?? 0, $response->status()));
+            }
         } catch (\Throwable $e) {
-            $this->error('Не удалось передать обновление ' . ($update['update_id'] ?? '?') . ': ' . $e->getMessage());
+            $this->error('Не удалось передать обновления: ' . $e->getMessage());
         }
     }
 

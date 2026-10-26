@@ -123,6 +123,18 @@ class SetBotCommands
                 'description' => __('messages.command_set_org_link_description'),
             ],
             [
+                'command' => 'broadcast_delete',
+                'description' => __('messages.command_broadcast_delete_description'),
+            ],
+            [
+                'command' => 'broadcast_off',
+                'description' => __('messages.command_broadcast_off_description'),
+            ],
+            [
+                'command' => 'broadcast_on',
+                'description' => __('messages.command_broadcast_on_description'),
+            ],
+            [
                 'command' => 'set_wifi',
                 'description' => __('messages.command_set_wifi_description'),
             ],

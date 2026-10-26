@@ -9,6 +9,7 @@ use App\Actions\Telegram\BannedContactMessage;
 use App\Actions\Telegram\CloseTopic;
 use App\Actions\Telegram\EditUserData;
 use App\Actions\Telegram\HandleBackupCommand;
+use App\Actions\Telegram\HandleBroadcastCommand;
 use App\Actions\Telegram\HandleOfferDocumentCommand;
 use App\Actions\Telegram\RenameTopic;
 use App\Actions\Telegram\ReopenTopic;
@@ -39,6 +40,7 @@ use App\Services\TgExternal\TgExternalEditService;
 use App\Services\TgExternal\TgExternalMessageService;
 use App\Services\TgVk\TgVkEditService;
 use App\Services\TgVk\TgVkMessageService;
+use App\Services\Broadcast\BroadcastManager;
 use App\Services\Broadcast\BroadcastMessageService;
 use App\Actions\Telegram\IsBroadcastTopic;
 use Illuminate\Http\Request;
@@ -132,7 +134,7 @@ class TelegramBotController
      */
     private function isGlobalAdminCommand(?string $text): bool
     {
-        foreach (array_merge(['/set_code', '/set_building_code', '/set_org_link', '/set_wifi'], HandleBackupCommand::COMMANDS, HandleOfferDocumentCommand::COMMANDS, [AdminPanel::COMMAND, SetRentalLink::COMMAND]) as $command) {
+        foreach (array_merge(['/set_code', '/set_building_code', '/set_org_link', '/set_wifi'], HandleBackupCommand::COMMANDS, HandleBroadcastCommand::COMMANDS, HandleOfferDocumentCommand::COMMANDS, [AdminPanel::COMMAND, SetRentalLink::COMMAND]) as $command) {
             if ($this->isCommand($command, $text)) {
                 return true;
             }
@@ -288,7 +290,20 @@ class TelegramBotController
     public function bot_query(): void
     {
         $this->checkBotQuery();
-        
+
+        // Правка сообщения в топике рассылки: исправляем уже отправленную рассылку у клиентов, новую не создаём
+        if ($this->dataHook->typeQuery === 'edited_message' && $this->dataHook->typeSource === 'supergroup'
+            && !$this->dataHook->isBot && IsBroadcastTopic::execute($this->dataHook->messageThreadId)) {
+            $report = (new BroadcastManager())->applyEdit($this->dataHook);
+
+            if ($report !== null) {
+                (new BroadcastMessageService())->reply($this->dataHook, $report);
+            }
+
+            echo 'ok';
+            return;
+        }
+
         // Проверка на топик массовых рассылок (до определения платформы)
         // Логируем ВСЕ сообщения в supergroup для отладки
         if ($this->dataHook->typeQuery === 'message' && $this->dataHook->typeSource === 'supergroup') {
@@ -311,15 +326,20 @@ class TelegramBotController
                 ]);
                 
                 if (IsBroadcastTopic::execute($this->dataHook->messageThreadId)) {
-                    // Это сообщение из топика массовых рассылок
-                    Log::info('TelegramBotController: ✅ ЗАПУСК МАССОВОЙ РАССЫЛКИ', [
-                        'message_thread_id' => $this->dataHook->messageThreadId,
-                        'update_id' => $this->dataHook->updateId,
-                        'message_id' => $this->dataHook->messageId,
-                    ]);
-                    (new BroadcastMessageService())->handle($this->dataHook);
-                    echo 'ok';
-                    return;
+                    // Это сообщение из топика массовых рассылок. Команды (текст с «/») никогда не рассылаются:
+                    // они выполняются как команды администратора ниже
+                    $isCommand = str_starts_with(trim((string)$this->dataHook->text), '/');
+
+                    if (!$isCommand) {
+                        Log::info('TelegramBotController: ✅ ЗАПУСК МАССОВОЙ РАССЫЛКИ', [
+                            'message_thread_id' => $this->dataHook->messageThreadId,
+                            'update_id' => $this->dataHook->updateId,
+                            'message_id' => $this->dataHook->messageId,
+                        ]);
+                        (new BroadcastMessageService())->handle($this->dataHook);
+                        echo 'ok';
+                        return;
+                    }
                 } else {
                     Log::info('TelegramBotController: не является топиком массовых рассылок', [
                         'message_thread_id' => $this->dataHook->messageThreadId,
@@ -412,6 +432,14 @@ class TelegramBotController
                 foreach (HandleOfferDocumentCommand::COMMANDS as $offerCommand) {
                     if ($this->isCommand($offerCommand, $offerCommandText)) {
                         (new HandleOfferDocumentCommand())->execute($this->dataHook, $offerCommand);
+                        die();
+                    }
+                }
+
+                // Управление рассылкой (удалить у клиентов, выключить/включить) — глобальные команды администраторов
+                foreach (HandleBroadcastCommand::COMMANDS as $broadcastCommand) {
+                    if ($this->isCommand($broadcastCommand, $this->dataHook->text)) {
+                        (new HandleBroadcastCommand())->execute($this->dataHook, $broadcastCommand);
                         die();
                     }
                 }
