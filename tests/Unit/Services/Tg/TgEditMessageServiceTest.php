@@ -27,6 +27,9 @@ class TgEditMessageServiceTest extends TestCase
         Message::truncate();
         Queue::fake();
 
+        // Эти тесты проверяют прежний способ (правка копии сообщения в теме); пересылка покрыта в ClientForwardTest
+        config(['traffic_source.settings.telegram.forward_client_messages' => false]);
+
         $this->botUser = BotUser::getUserByChatId(time(), 'telegram');
         $this->botUser->topic_id = 123;
         $this->botUser->save();

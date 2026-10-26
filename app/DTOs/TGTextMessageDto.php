@@ -32,6 +32,7 @@ use Spatie\LaravelData\Data;
  * @property float|null  $longitude
  * @property string|null $name
  * @property string|null $animation
+ * @property int|string|null $from_chat_id
  */
 class TGTextMessageDto extends Data
 {
@@ -64,6 +65,7 @@ class TGTextMessageDto extends Data
         public int|string|null         $icon_custom_emoji_id = null,
         public ?string        $name = null,
         public ?string        $animation = null,
+        public int|string|null $from_chat_id = null,
     ) {
     }
 

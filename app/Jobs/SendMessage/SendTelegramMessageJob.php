@@ -34,7 +34,9 @@ class SendTelegramMessageJob extends AbstractSendMessageJob
         TGTextMessageDto $queryParams,
         string $typeMessage,
         mixed $telegramMethods = null,
+        bool $forwardFirst = false,
     ) {
+        $this->forwardFirst = $forwardFirst;
         $this->botUserId = $botUserId;
         $this->updateDto = $updateDto;
         $this->queryParams = $queryParams;
@@ -70,7 +72,9 @@ class SendTelegramMessageJob extends AbstractSendMessageJob
                                 $this->botUserId,
                                 $this->updateDto,
                                 $this->queryParams,
-                                $this->typeMessage
+                                $this->typeMessage,
+                                null,
+                                $this->forwardFirst
                             ),
                         ])->dispatch($this->botUserId);
                         
@@ -84,12 +88,41 @@ class SendTelegramMessageJob extends AbstractSendMessageJob
                             $this->botUserId,
                             $this->updateDto,
                             $this->queryParams,
-                            $this->typeMessage
+                            $this->typeMessage,
+                            null,
+                            $this->forwardFirst
                         ),
                     ])->dispatch($this->botUserId);
 
                     return;
                 }
+            }
+
+            // Сообщение клиента пересылаем в его тему: в группе видно имя и фото клиента. Если Telegram
+            // не даёт переслать (запрет пересылки и т. п.) — отправляем копию, как раньше
+            if ($this->forwardFirst && $this->typeMessage === 'incoming' && $botUser->topic_id) {
+                $forward = $this->telegramMethods->sendQueryTelegram('forwardMessage', [
+                    'chat_id' => $params['chat_id'],
+                    'message_thread_id' => $botUser->topic_id,
+                    'from_chat_id' => $this->updateDto->chatId,
+                    'message_id' => $this->updateDto->messageId,
+                ]);
+
+                if ($forward->ok === true) {
+                    $this->saveMessage($botUser, $forward);
+                    $this->updateTopic($botUser, $this->typeMessage);
+                    return;
+                }
+
+                if (in_array($forward->type_error, ['TOPIC_CLOSED', 'TOPIC_NOT_FOUND', 'TOPIC_DELETED'], true)) {
+                    $this->telegramResponseHandler($forward);
+                    return;
+                }
+
+                Log::info('SendTelegramMessageJob: не удалось переслать сообщение клиента, отправляю копию', [
+                    'bot_user_id' => $this->botUserId,
+                    'error' => $forward->rawData['description'] ?? null,
+                ]);
             }
 
             $response = $this->telegramMethods->sendQueryTelegram(

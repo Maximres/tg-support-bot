@@ -111,10 +111,27 @@ class TgMessageService extends FromTgMessageService
                 $this->update,
                 $this->messageParamsDTO,
                 $this->typeMessage,
+                null,
+                $this->shouldForward(),
             );
         } catch (\Throwable $e) {
             (new LokiLogger())->logException($e);
         }
+    }
+
+    /**
+     * Сообщения клиента пересылаются в тему: в группе видно его имя и фото профиля.
+     * Контакт (поделился номером) обрабатывается отдельно и остаётся текстом.
+     *
+     * @return bool
+     */
+    private function shouldForward(): bool
+    {
+        return $this->typeMessage === 'incoming'
+            && $this->update->typeSource === 'private'
+            && (bool)config('traffic_source.settings.telegram.forward_client_messages', true)
+            && empty($this->update->rawData['message']['contact'])
+            && !empty($this->update->messageId);
     }
 
     /**

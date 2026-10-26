@@ -38,6 +38,9 @@ abstract class AbstractSendMessageJob implements ShouldQueue
 
     public string $typeMessage = '';
 
+    /** Сообщение клиента сначала пересылается в тему (видно имя и фото клиента); при неудаче — копия */
+    public bool $forwardFirst = false;
+
     abstract public function handle(): void;
 
     /**
@@ -224,7 +227,9 @@ abstract class AbstractSendMessageJob implements ShouldQueue
                         $this->botUserId,
                         $this->updateDto,
                         $this->queryParams,
-                        $this->typeMessage
+                        $this->typeMessage,
+                        null,
+                        $this->forwardFirst
                     ),
                 ])->dispatch($this->botUserId);
             } elseif ($this->updateDto instanceof VkUpdateDto) {
