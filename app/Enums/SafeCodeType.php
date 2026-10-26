@@ -10,6 +10,7 @@ enum SafeCodeType: string
     case SAFE = 'safe';
     case BUILDING = 'building';
     case ORG_LINK = 'org_link';
+    case WIFI = 'wifi';
 
     /**
      * Требуется ли доверие (is_trusted) для получения значения этого типа
@@ -18,6 +19,14 @@ enum SafeCodeType: string
     {
         // Правила (ссылка) видны всем; коды — только доверенным
         return !$this->isUrl();
+    }
+
+    /**
+     * Многострочный текст (сеть и пароль Wi-Fi), который выдаётся сообщением в чат
+     */
+    public function isText(): bool
+    {
+        return $this === self::WIFI;
     }
 
     /**
@@ -45,6 +54,7 @@ enum SafeCodeType: string
             self::SAFE => '/set_code',
             self::BUILDING => '/set_building_code',
             self::ORG_LINK => '/set_org_link',
+            self::WIFI => '/set_wifi',
         };
     }
 
@@ -56,6 +66,7 @@ enum SafeCodeType: string
         return match ($this) {
             self::SAFE, self::BUILDING => '1234',
             self::ORG_LINK => 'https://example.com',
+            self::WIFI => "Сеть: MyWifi\nпароль: 12345678",
         };
     }
 
@@ -68,6 +79,7 @@ enum SafeCodeType: string
             self::SAFE => 'Код от сейфа',
             self::BUILDING => 'Код от здания',
             self::ORG_LINK => 'Ссылка на правила',
+            self::WIFI => 'Wi-Fi (сеть и пароль)',
         };
     }
 
@@ -80,6 +92,7 @@ enum SafeCodeType: string
             self::SAFE => '🔐 Код сейфа',
             self::BUILDING => '🔐 Код здания',
             self::ORG_LINK => '📋 Правила',
+            self::WIFI => '📶 Wi-Fi',
         };
     }
 }

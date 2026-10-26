@@ -50,7 +50,6 @@ class TenantFlowTest extends TestCase
                 'map' => 'https://example.com/map',
                 'schedule' => 'https://example.com/schedule',
                 'payment' => 'https://example.com/payment',
-                'wifi' => 'https://example.com/wifi',
                 'keys' => 'https://example.com/keys',
             ],
         ]);
@@ -206,7 +205,7 @@ class TenantFlowTest extends TestCase
         $menu = $this->menuKeyboardJson();
         $this->assertStringContainsString('offer_show', $menu);
         $this->assertStringContainsString('link_show_cabinets', $menu);
-        foreach (['link_show_hub', 'link_show_schedule', 'link_show_wifi', 'link_show_keys'] as $closed) {
+        foreach (['link_show_hub', 'link_show_schedule', 'access_show_wifi', 'link_show_keys', 'access_show_codes'] as $closed) {
             $this->assertStringNotContainsString($closed, $menu);
         }
         $this->assertStringNotContainsString('access_show_', $menu);

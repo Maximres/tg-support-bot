@@ -183,7 +183,7 @@ class AdminPanelTest extends TestCase
         $this->assertCount(1, $menu);
 
         $keyboard = $this->markup($menu[0][0]);
-        foreach (['set_code', 'set_building_code', 'set_org_link', 'link_hub', 'link_cabinets', 'link_map', 'link_schedule', 'link_payment', 'link_wifi', 'link_keys'] as $action) {
+        foreach (['set_code', 'set_building_code', 'set_org_link', 'link_hub', 'link_cabinets', 'link_map', 'link_schedule', 'link_payment', 'set_wifi', 'link_keys', 'link_prices', 'link_cancel', 'link_groups'] as $action) {
             $this->assertStringContainsString("panel:{$action}", $keyboard);
         }
 

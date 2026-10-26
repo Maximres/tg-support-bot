@@ -16,7 +16,7 @@ class RentalLinks
     /** Пометка в БД: пункт скрыт из меню, даже если значение есть в .env */
     public const DISABLED = '-';
 
-    public const KEYS = ['hub', 'cabinets', 'map', 'schedule', 'payment', 'wifi', 'keys'];
+    public const KEYS = ['hub', 'cabinets', 'map', 'schedule', 'payment', 'keys', 'prices', 'cancel', 'groups'];
 
     /** Ссылки, доступные всем клиентам без открытия доступа */
     public const PUBLIC = ['cabinets', 'map'];
@@ -28,8 +28,10 @@ class RentalLinks
         'map' => ['map', 'карта'],
         'schedule' => ['schedule', 'график'],
         'payment' => ['payment', 'оплата'],
-        'wifi' => ['wifi', 'wi-fi', 'вайфай'],
         'keys' => ['keys', 'ключи', 'ключ'],
+        'prices' => ['prices', 'цены', 'прайс'],
+        'cancel' => ['cancel', 'отмена'],
+        'groups' => ['groups', 'группы', 'группа'],
     ];
 
     /**

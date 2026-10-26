@@ -103,12 +103,21 @@ class SendAccessMessage
         $linkButton('map');
 
         if ($hasAccess) {
-            foreach (['hub', 'schedule', 'payment', 'wifi', 'keys'] as $key) {
+            foreach (['hub', 'schedule', 'payment'] as $key) {
                 $linkButton($key);
             }
 
-            foreach ([SafeCodeType::SAFE, SafeCodeType::BUILDING] as $type) {
-                $buttons[] = ['text' => $type->buttonLabel(), 'callback_data' => $type->callbackData()];
+            if (SafeCode::current(SafeCodeType::WIFI)) {
+                $buttons[] = ['text' => SafeCodeType::WIFI->buttonLabel(), 'callback_data' => SafeCodeType::WIFI->callbackData()];
+            }
+
+            foreach (['keys', 'prices', 'cancel', 'groups'] as $key) {
+                $linkButton($key);
+            }
+
+            // Код сейфа и код здания — одна кнопка «Коды»
+            if (SafeCode::current(SafeCodeType::SAFE) || SafeCode::current(SafeCodeType::BUILDING)) {
+                $buttons[] = ['text' => __('messages.but_menu_codes'), 'callback_data' => 'access_show_codes'];
             }
         }
 

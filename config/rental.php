@@ -17,8 +17,16 @@ return [
         'map' => env('RENTAL_LINK_MAP'),
         'schedule' => env('RENTAL_LINK_SCHEDULE'),
         'payment' => env('RENTAL_LINK_PAYMENT'),
-        'wifi' => env('RENTAL_LINK_WIFI'),
         // Ссылка на страницу с ключами — только для доверенных, поэтому открывается через callback
         'keys' => env('RENTAL_LINK_KEYS'),
+        'prices' => env('RENTAL_LINK_PRICES'),
+        'cancel' => env('RENTAL_LINK_CANCEL'),
+        'groups' => env('RENTAL_LINK_GROUPS'),
+    ],
+
+    // Приложение Google Таблицы: в сообщении «График» подсказываем, где скачать его для телефона
+    'apps' => [
+        'sheets_android' => env('RENTAL_APP_SHEETS_ANDROID', 'https://play.google.com/store/apps/details?id=com.google.android.apps.docs.editors.sheets'),
+        'sheets_ios' => env('RENTAL_APP_SHEETS_IOS', 'https://apps.apple.com/app/google-sheets/id842849113'),
     ],
 ];

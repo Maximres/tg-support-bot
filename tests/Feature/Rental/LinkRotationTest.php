@@ -47,7 +47,6 @@ class LinkRotationTest extends TestCase
                 'map' => null,
                 'schedule' => 'https://example.com/schedule',
                 'payment' => null,
-                'wifi' => 'https://example.com/wifi',
                 'keys' => 'https://example.com/keys',
             ],
         ]);
@@ -150,8 +149,8 @@ class LinkRotationTest extends TestCase
         $untrusted = $this->makeBotUser(['is_trusted' => false]);
         $banned = $this->makeBotUser(['is_trusted' => true, 'is_banned' => true]);
 
-        (new ShowRentalMaterial())->showLink($this->callbackDto($untrusted, 'link_show_wifi'), $untrusted, 'wifi');
-        (new ShowRentalMaterial())->showLink($this->callbackDto($banned, 'link_show_wifi'), $banned, 'wifi');
+        (new ShowRentalMaterial())->showLink($this->callbackDto($untrusted, 'link_show_keys'), $untrusted, 'keys');
+        (new ShowRentalMaterial())->showLink($this->callbackDto($banned, 'link_show_keys'), $banned, 'keys');
 
         $this->assertSame(0, $this->sentCount('sendMessage'));
         $this->assertSame(2, $this->sentCount('answerCallbackQuery', fn ($r) => $r['show_alert'] === true));
@@ -192,8 +191,11 @@ class LinkRotationTest extends TestCase
         (new SetRentalLink())->execute($this->groupCommand('/set_link график https://a.example.com/s#gid=1'));
         $this->assertSame('https://a.example.com/s#gid=1', RentalLinks::get('schedule'));
 
-        (new SetRentalLink())->execute($this->groupCommand('/set_link wifi https://b.example.com/w'));
-        $this->assertSame('https://b.example.com/w', RentalLinks::get('wifi'));
+        (new SetRentalLink())->execute($this->groupCommand('/set_link prices https://b.example.com/p'));
+        $this->assertSame('https://b.example.com/p', RentalLinks::get('prices'));
+
+        (new SetRentalLink())->execute($this->groupCommand('/set_link отмена https://b.example.com/c'));
+        $this->assertSame('https://b.example.com/c', RentalLinks::get('cancel'));
     }
 
     public function test_non_admin_cannot_set_link(): void
@@ -233,7 +235,7 @@ class LinkRotationTest extends TestCase
         $trusted = $this->makeBotUser(['is_trusted' => true]);
 
         (new SetRentalLink())->execute($this->groupCommand('/set_link график https://new.example.com/s'));
-        (new SetRentalLink())->execute($this->groupCommand('/set_link wifi https://new.example.com/w'));
+        (new SetRentalLink())->execute($this->groupCommand('/set_link prices https://new.example.com/w'));
 
         $this->assertSame(0, $this->sentToUser($trusted));
     }

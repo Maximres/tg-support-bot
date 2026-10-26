@@ -128,6 +128,11 @@ class SetTrustedValue
      */
     private function isValidValue(SafeCodeType $type, string $value): bool
     {
+        if ($type->isText()) {
+            // Текст Wi-Fi может быть многострочным (сеть и пароль), но не слишком длинным
+            return mb_strlen($value) <= 500;
+        }
+
         if (mb_strlen($value) > 256 || preg_match('/[\r\n]/', $value)) {
             return false;
         }

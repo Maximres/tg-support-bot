@@ -7,7 +7,9 @@ use App\DTOs\TGTextMessageDto;
 use App\Jobs\SendTelegramSimpleQueryJob;
 use App\Models\BotUser;
 use App\Services\Rental\OfferDocument;
+use App\Enums\SafeCodeType;
 use App\Services\Rental\RentalLinks;
+use Illuminate\Support\Facades\Lang;
 
 /**
  * Пункты меню материалов, которые не сводятся к простому показу значения:
@@ -88,6 +90,12 @@ class ShowRentalMaterial
      */
     public function showLink(TelegramUpdateDto $update, BotUser $botUser, string $key): void
     {
+        // Старые закреплённые меню: Wi-Fi был ссылкой, теперь это текст
+        if ($key === 'wifi') {
+            (new ShowTrustedValue())->execute($update, $botUser, SafeCodeType::WIFI);
+            return;
+        }
+
         if (!in_array($key, RentalLinks::KEYS, true)) {
             $this->ack($update->callbackId);
             return;
@@ -114,15 +122,50 @@ class ShowRentalMaterial
         SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from([
             'methodQuery' => 'sendMessage',
             'chat_id' => $botUser->chat_id,
-            'text' => __('messages.access_link_message', ['title' => RentalLinks::title($key)]),
+            'text' => $this->messageText($key),
             'parse_mode' => 'html',
             'reply_markup' => [
                 'inline_keyboard' => [
                     [
-                        ['text' => __('messages.but_access_open_org_link'), 'url' => $link],
+                        ['text' => $this->buttonLabel($key), 'url' => $link],
                     ],
                 ],
             ],
         ]));
+    }
+
+    /**
+     * Текст сообщения со ссылкой: свой для пункта (например, «График» с подсказкой про приложение), иначе общий
+     *
+     * @param string $key
+     *
+     * @return string
+     */
+    private function messageText(string $key): string
+    {
+        $custom = "messages.access_link_message_{$key}";
+
+        if (Lang::has($custom)) {
+            return __($custom, [
+                'android' => config('rental.apps.sheets_android'),
+                'ios' => config('rental.apps.sheets_ios'),
+            ]);
+        }
+
+        return __('messages.access_link_message', ['title' => RentalLinks::title($key)]);
+    }
+
+    /**
+     * Подпись кнопки со ссылкой: своя для пункта («Открыть график») или общая
+     *
+     * @param string $key
+     *
+     * @return string
+     */
+    private function buttonLabel(string $key): string
+    {
+        $custom = "messages.but_access_open_{$key}";
+
+        return Lang::has($custom) ? __($custom) : __('messages.but_access_open_org_link');
     }
 }

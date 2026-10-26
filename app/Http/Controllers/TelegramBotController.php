@@ -132,7 +132,7 @@ class TelegramBotController
      */
     private function isGlobalAdminCommand(?string $text): bool
     {
-        foreach (array_merge(['/set_code', '/set_building_code', '/set_org_link'], HandleBackupCommand::COMMANDS, HandleOfferDocumentCommand::COMMANDS, [AdminPanel::COMMAND, SetRentalLink::COMMAND]) as $command) {
+        foreach (array_merge(['/set_code', '/set_building_code', '/set_org_link', '/set_wifi'], HandleBackupCommand::COMMANDS, HandleOfferDocumentCommand::COMMANDS, [AdminPanel::COMMAND, SetRentalLink::COMMAND]) as $command) {
             if ($this->isCommand($command, $text)) {
                 return true;
             }
@@ -265,6 +265,10 @@ class TelegramBotController
                 if ($this->botUser && $this->dataHook->typeSource === 'private') {
                     (new ShowRentalMaterial())->showKeys($this->dataHook, $this->botUser);
                 }
+            } elseif ($this->dataHook->callbackData === 'access_show_codes') {
+                if ($this->botUser && $this->dataHook->typeSource === 'private') {
+                    (new ShowTrustedValue())->showCodes($this->dataHook, $this->botUser);
+                }
             } elseif (str_contains($this->dataHook->callbackData, 'access_show_')) {
                 if ($this->botUser && $this->dataHook->typeSource === 'private') {
                     $type = SafeCodeType::tryFrom(str_replace('access_show_', '', $this->dataHook->callbackData));
@@ -380,6 +384,9 @@ class TelegramBotController
                     die();
                 } elseif ($this->isCommand('/set_org_link', $this->dataHook->text) && $this->isSupergroup()) {
                     (new SetTrustedValue())->execute($this->dataHook, SafeCodeType::ORG_LINK);
+                    die();
+                } elseif ($this->isCommand('/set_wifi', $this->dataHook->text) && $this->isSupergroup()) {
+                    (new SetTrustedValue())->execute($this->dataHook, SafeCodeType::WIFI);
                     die();
                 }
 

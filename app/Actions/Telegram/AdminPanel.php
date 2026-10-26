@@ -51,6 +51,7 @@ class AdminPanel
         'set_code' => ['/set_code', 'messages.panel.prompt_set_code'],
         'set_building_code' => ['/set_building_code', 'messages.panel.prompt_set_building_code'],
         'set_org_link' => ['/set_org_link', 'messages.panel.prompt_set_org_link'],
+        'set_wifi' => ['/set_wifi', 'messages.panel.prompt_set_wifi'],
         'backup_time' => ['/backup_time', 'messages.panel.prompt_backup_time'],
         'backup_days' => ['/backup_days', 'messages.panel.prompt_backup_days'],
         'backup_to' => ['/backup_to', 'messages.panel.prompt_backup_to'],
@@ -243,6 +244,7 @@ class AdminPanel
             '/set_code' => (new SetTrustedValue())->execute($update, SafeCodeType::SAFE),
             '/set_building_code' => (new SetTrustedValue())->execute($update, SafeCodeType::BUILDING),
             '/set_org_link' => (new SetTrustedValue())->execute($update, SafeCodeType::ORG_LINK),
+            '/set_wifi' => (new SetTrustedValue())->execute($update, SafeCodeType::WIFI),
             '/set_offer', '/show_offer' => (new HandleOfferDocumentCommand())->execute($update, $command),
             default => (new HandleBackupCommand())->execute($update, $command),
         };
@@ -336,7 +338,7 @@ class AdminPanel
         $mark = fn (bool $isSet) => $isSet ? ' ✅' : ' ➖';
         $buttons = [];
 
-        foreach ([['set_code', SafeCodeType::SAFE], ['set_building_code', SafeCodeType::BUILDING], ['set_org_link', SafeCodeType::ORG_LINK]] as [$action, $type]) {
+        foreach ([['set_code', SafeCodeType::SAFE], ['set_building_code', SafeCodeType::BUILDING], ['set_org_link', SafeCodeType::ORG_LINK], ['set_wifi', SafeCodeType::WIFI]] as [$action, $type]) {
             $buttons[] = [
                 'text' => __("messages.panel.but_{$action}") . $mark(SafeCode::current($type) !== null),
                 'callback_data' => self::CALLBACK_PREFIX . $action,

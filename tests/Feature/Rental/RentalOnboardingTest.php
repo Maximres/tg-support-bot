@@ -48,8 +48,10 @@ class RentalOnboardingTest extends TestCase
                 'map' => null,
                 'schedule' => 'https://example.com/schedule',
                 'payment' => null,
-                'wifi' => 'https://example.com/wifi',
                 'keys' => 'https://example.com/keys',
+                'prices' => 'https://example.com/prices',
+                'cancel' => 'https://example.com/cancel',
+                'groups' => 'https://example.com/groups',
             ],
         ]);
     }
@@ -191,7 +193,7 @@ class RentalOnboardingTest extends TestCase
     {
         $flat = json_encode((new SendAccessMessage())->getKeyboard(false), JSON_UNESCAPED_UNICODE);
 
-        foreach (['link_show_hub', 'link_show_schedule', 'link_show_wifi', 'link_show_keys', 'access_show_safe', 'access_show_building'] as $callback) {
+        foreach (['link_show_hub', 'link_show_schedule', 'access_show_wifi', 'link_show_keys', 'link_show_prices', 'link_show_cancel', 'link_show_groups', 'access_show_codes'] as $callback) {
             $this->assertStringNotContainsString($callback, $flat);
         }
     }
@@ -208,6 +210,10 @@ class RentalOnboardingTest extends TestCase
     public function test_menu_with_access_has_every_item_but_no_direct_links(): void
     {
         SafeCode::create(['code' => 'https://example.com/rules', 'type' => SafeCodeType::ORG_LINK->value]);
+        SafeCode::create(['code' => "Сеть: Test
+пароль: 123", 'type' => SafeCodeType::WIFI->value]);
+        SafeCode::create(['code' => '1111', 'type' => SafeCodeType::SAFE->value]);
+        SafeCode::create(['code' => '2222', 'type' => SafeCodeType::BUILDING->value]);
 
         $keyboard = (new SendAccessMessage())->getKeyboard(true);
         $flat = json_encode($keyboard, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -225,9 +231,13 @@ class RentalOnboardingTest extends TestCase
         $last = end($keyboard);
         $this->assertSame('offer_show', end($last)['callback_data']);
 
-        foreach (['link_show_cabinets', 'link_show_wifi', 'link_show_schedule', 'link_show_keys', 'access_show_safe', 'access_show_building', 'access_show_org_link', 'offer_show'] as $callback) {
+        foreach (['link_show_cabinets', 'access_show_wifi', 'link_show_schedule', 'link_show_keys', 'link_show_prices', 'link_show_cancel', 'link_show_groups', 'access_show_codes', 'access_show_org_link', 'offer_show'] as $callback) {
             $this->assertStringContainsString($callback, $flat);
         }
+
+        // Коды объединены в одну кнопку, отдельных кнопок сейфа и здания нет
+        $this->assertStringNotContainsString('access_show_safe', $flat);
+        $this->assertStringNotContainsString('access_show_building', $flat);
 
         // Незаданные ссылки в меню не попадают
         $this->assertStringNotContainsString('link_show_map', $flat);

@@ -41,12 +41,68 @@ class ShowTrustedValue
             return;
         }
 
+        if ($type->isText()) {
+            $this->revealText($update, $botUser, $type);
+            return;
+        }
+
         $current = SafeCode::current($type);
         $text = $current
             ? __('messages.access_value_reveal', ['type' => $type->label(), 'value' => $current->code])
             : __('messages.access_value_not_set', ['type' => $type->label()]);
 
         $this->ack($update->callbackId, $text, true);
+    }
+
+    /**
+     * Кнопка «Коды»: код сейфа и код здания одним всплывающим окном
+     *
+     * @param TelegramUpdateDto $update
+     * @param BotUser           $botUser
+     *
+     * @return void
+     */
+    public function showCodes(TelegramUpdateDto $update, BotUser $botUser): void
+    {
+        if (!$botUser->hasMaterialsAccess()) {
+            $this->ack($update->callbackId, __('messages.access_not_trusted'), true);
+            return;
+        }
+
+        $notSet = __('messages.access_code_not_set');
+
+        $this->ack($update->callbackId, __('messages.access_codes_text', [
+            'safe' => SafeCode::current(SafeCodeType::SAFE)?->code ?? $notSet,
+            'building' => SafeCode::current(SafeCodeType::BUILDING)?->code ?? $notSet,
+        ]), true);
+    }
+
+    /**
+     * Текст (сеть и пароль Wi-Fi) приходит обычным сообщением: его можно скопировать
+     *
+     * @param TelegramUpdateDto $update
+     * @param BotUser           $botUser
+     * @param SafeCodeType      $type
+     *
+     * @return void
+     */
+    private function revealText(TelegramUpdateDto $update, BotUser $botUser, SafeCodeType $type): void
+    {
+        $current = SafeCode::current($type);
+
+        if (!$current) {
+            $this->ack($update->callbackId, __('messages.access_value_not_set', ['type' => $type->label()]), true);
+            return;
+        }
+
+        $this->ack($update->callbackId, '', false);
+
+        SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from([
+            'methodQuery' => 'sendMessage',
+            'chat_id' => $botUser->chat_id,
+            'text' => e($current->code),
+            'parse_mode' => 'html',
+        ]));
     }
 
     /**
