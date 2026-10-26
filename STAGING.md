@@ -30,6 +30,17 @@ docker compose -p tgstaging -f docker-compose.staging.yml run --rm poll php arti
 
 Остановка: `... down` (данные остаются), полный сброс данных: `... down -v`.
 
+## Сверка с продом и тестовые данные
+
+Перед проверкой убедитесь, что стенд соответствует проду, и заполните его данными той же формы:
+
+```bash
+bash scripts/check-staging-parity.sh        # код, composer.lock, версии PHP/PostgreSQL, раскладка меню
+docker compose -p tgstaging -f docker-compose.staging.yml exec app php artisan staging:seed --offer-pdf=storage/app/offer-test.pdf
+```
+
+`staging:seed` задаёт правила, коды и загружает PDF договора тестовым ботом (file_id привязан к боту, поэтому боевой для стенда не годится). Ссылки меню и Wi-Fi стенд берёт из `.env.staging` и команд `/set_link`, `/set_wifi`. Идентификатор темы рассылки — в `TELEGRAM_BROADCAST_TOPIC_ID` (`.env.staging`), это тема тестовой группы.
+
 ## Тесты
 
 ```bash
