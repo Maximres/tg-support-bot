@@ -48,6 +48,7 @@ class AdminPanel
     /** Кнопка => [команда, подсказка], для которых нужно значение от администратора */
     private const PROMPTS = [
         'set_offer' => ['/set_offer', 'messages.panel.prompt_set_offer'],
+        'set_offer_text' => ['/set_offer_text', 'messages.panel.prompt_set_offer_text'],
         'set_code' => ['/set_code', 'messages.panel.prompt_set_code'],
         'set_building_code' => ['/set_building_code', 'messages.panel.prompt_set_building_code'],
         'set_org_link' => ['/set_org_link', 'messages.panel.prompt_set_org_link'],
@@ -211,8 +212,8 @@ class AdminPanel
                 return;
             }
 
-            if ($command === '/set_offer') {
-                // PDF уже приложен к этому сообщению — обработчик сам найдёт его
+            if (in_array($command, ['/set_offer', '/set_offer_text'], true)) {
+                // PDF (или текст с форматированием) уже в этом сообщении — обработчик сам их разберёт
                 $this->runCommand($update, $command);
                 return;
             }
@@ -246,6 +247,7 @@ class AdminPanel
             '/set_org_link' => (new SetTrustedValue())->execute($update, SafeCodeType::ORG_LINK),
             '/set_wifi' => (new SetTrustedValue())->execute($update, SafeCodeType::WIFI),
             '/set_offer', '/show_offer' => (new HandleOfferDocumentCommand())->execute($update, $command),
+            '/set_offer_text' => (new HandleOfferTextCommand())->execute($update, $command),
             default => (new HandleBackupCommand())->execute($update, $command),
         };
     }
@@ -318,6 +320,7 @@ class AdminPanel
 
         return [
             [$button('show_offer'), $button('set_offer')],
+            [$button('set_offer_text')],
             [$button('rotate')],
             [$button('backup_status'), $button('backup_now')],
             [$button('backup_on'), $button('backup_off')],

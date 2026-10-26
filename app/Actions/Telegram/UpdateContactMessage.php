@@ -92,11 +92,14 @@ class UpdateContactMessage
     private function editContactMessage(BotUser $botUser, string $text, array $keyboard): bool
     {
         try {
-            $response = TelegramMethods::sendQueryTelegram('editMessageText', [
+            // Карточка с фото профиля клиента — это фото с подписью: правится подпись, а не текст
+            $isPhoto = (bool)$botUser->contact_info_is_photo;
+
+            $response = TelegramMethods::sendQueryTelegram($isPhoto ? 'editMessageCaption' : 'editMessageText', [
                 'chat_id' => config('traffic_source.settings.telegram.group_id'),
                 'message_thread_id' => $botUser->topic_id,
                 'message_id' => $botUser->contact_info_message_id,
-                'text' => $text,
+                ($isPhoto ? 'caption' : 'text') => $text,
                 'parse_mode' => 'html',
                 'reply_markup' => [
                     'inline_keyboard' => $keyboard,
@@ -108,7 +111,13 @@ class UpdateContactMessage
             }
 
             // Проверяем, не была ли ошибка из-за того, что сообщение не найдено
-            $errorDescription = $response->description ?? '';
+            $errorDescription = (string)($response->rawData['description'] ?? '');
+
+            // Текст и кнопки не изменились — карточка актуальна
+            if (str_contains($errorDescription, 'message is not modified')) {
+                return true;
+            }
+
             if (str_contains($errorDescription, 'message to edit not found') ||
                 str_contains($errorDescription, 'MESSAGE_NOT_FOUND')) {
                 Log::info('UpdateContactMessage: сообщение не найдено, будет отправлено новое', [
@@ -145,7 +154,7 @@ class UpdateContactMessage
      */
     private function sendNewContactMessage(BotUser $botUser, string $text, array $keyboard): void
     {
-        $queryParams = TGTextMessageDto::from([
+        $params = [
             'methodQuery' => 'sendMessage',
             'chat_id' => config('traffic_source.settings.telegram.group_id'),
             'message_thread_id' => $botUser->topic_id,
@@ -154,7 +163,20 @@ class UpdateContactMessage
             'reply_markup' => [
                 'inline_keyboard' => $keyboard,
             ],
-        ]);
+        ];
+
+        // Если у клиента есть фото профиля, карточка отправляется фотографией с подписью — так клиента видно сразу.
+        // Подпись у фото — до 1024 символов; карточка короче, но на всякий случай проверяем.
+        $photo = $botUser->platform === 'telegram' && mb_strlen($text) <= 1000 ? GetProfilePhoto::execute((int)$botUser->chat_id) : null;
+
+        if ($photo) {
+            unset($params['text']);
+            $params['methodQuery'] = 'sendPhoto';
+            $params['photo'] = $photo;
+            $params['caption'] = $text;
+        }
+
+        $queryParams = TGTextMessageDto::from($params);
 
         // Отправляем через job с callback для сохранения message_id
         SendContactMessageWithCallbackJob::dispatch($botUser->id, $queryParams);

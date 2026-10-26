@@ -46,16 +46,33 @@ class SendContactMessageWithCallbackJob implements ShouldQueue
             }
 
             $params = $this->queryParams->toArray();
+            $isPhoto = $this->queryParams->methodQuery === 'sendPhoto';
             $response = TelegramMethods::sendQueryTelegram(
                 $this->queryParams->methodQuery,
                 $params,
                 $this->queryParams->token
             );
 
+            // Фото профиля не отправилось (файл больше недоступен и т. п.) — отправляем карточку обычным текстом
+            if ($isPhoto && !$response->ok) {
+                Log::info('SendContactMessageWithCallbackJob: не удалось отправить карточку с фото, отправляю текстом', [
+                    'bot_user_id' => $botUser->id,
+                    'error' => $response->rawData['description'] ?? null,
+                ]);
+
+                unset($params['photo']);
+                $params['text'] = $params['caption'];
+                unset($params['caption']);
+                $isPhoto = false;
+
+                $response = TelegramMethods::sendQueryTelegram('sendMessage', $params, $this->queryParams->token);
+            }
+
             if ($response->ok && isset($response->message_id)) {
                 // Сохраняем message_id в BotUser
                 $previousMessageId = $botUser->contact_info_message_id ? (int)$botUser->contact_info_message_id : null;
                 $botUser->contact_info_message_id = $response->message_id;
+                $botUser->contact_info_is_photo = $isPhoto;
                 $botUser->save();
 
                 // Карточка всегда закреплена в теме; если её заменили новым сообщением — старая откреплена

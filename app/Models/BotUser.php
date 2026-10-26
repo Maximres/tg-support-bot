@@ -47,6 +47,7 @@ class BotUser extends Model
         'topic_id',
         'topic_closed_at',
         'contact_info_message_id',
+        'contact_info_is_photo',
         'platform',
         'phone_number',
         'full_name',
@@ -66,6 +67,7 @@ class BotUser extends Model
     protected $casts = [
         'offer_accepted_at' => 'datetime',
         'topic_closed_at' => 'datetime',
+        'contact_info_is_photo' => 'boolean',
     ];
 
     /**

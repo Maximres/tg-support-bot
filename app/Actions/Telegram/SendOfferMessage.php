@@ -6,6 +6,7 @@ use App\DTOs\TGTextMessageDto;
 use App\Jobs\SendTelegramSimpleQueryJob;
 use App\Models\BotUser;
 use App\Services\Rental\OfferDocument;
+use App\Services\Rental\OfferText;
 
 /**
  * Отправка сотруднику договора-оферты с кнопкой "Принимаю условия".
@@ -46,10 +47,10 @@ class SendOfferMessage
         if (!empty($document)) {
             $params['methodQuery'] = 'sendDocument';
             $params['document'] = $document;
-            $params['caption'] = __('messages.offer_message_text');
+            $params['caption'] = OfferText::html();
         } else {
             $params['methodQuery'] = 'sendMessage';
-            $params['text'] = __('messages.offer_message_text');
+            $params['text'] = OfferText::html();
         }
 
         SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from($params));

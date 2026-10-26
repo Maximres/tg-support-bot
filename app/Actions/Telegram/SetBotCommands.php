@@ -135,6 +135,10 @@ class SetBotCommands
                 'description' => __('messages.command_broadcast_on_description'),
             ],
             [
+                'command' => 'set_offer_text',
+                'description' => __('messages.command_set_offer_text_description'),
+            ],
+            [
                 'command' => 'set_wifi',
                 'description' => __('messages.command_set_wifi_description'),
             ],
