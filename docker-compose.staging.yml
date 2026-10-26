@@ -1,0 +1,100 @@
+# Локальный тестовый стенд: тестовый бот + тестовая группа, обновления через long polling (telegram:poll).
+# Полностью отделён от прода: свои БД/Redis (локальные тома), свой .env.staging.
+#
+# Запуск:   docker compose -p tgstaging -f docker-compose.staging.yml up -d --build
+# Тесты:    docker compose -p tgstaging -f docker-compose.staging.yml exec app php artisan test
+# Остановка: docker compose -p tgstaging -f docker-compose.staging.yml down        (данные остаются)
+# Сброс:    docker compose -p tgstaging -f docker-compose.staging.yml down -v      (данные удаляются)
+# Подробнее: STAGING.md
+
+name: tgstaging
+
+x-app: &app
+  build: .
+  # В образе приложения пользователь www-data; на стенде работаем от root, чтобы писать в том vendor и storage
+  user: "0:0"
+  env_file:
+    - .env.staging
+  volumes:
+    - .:/var/www
+    # Настоящий .env из папки проекта не читаем: Laravel берёт только настройки стенда
+    - ./.env.staging:/var/www/.env:ro
+    # vendor живёт в томе, а не на диске Windows (в папке проекта PHP-зависимостей нет)
+    - staging_vendor:/var/www/vendor
+  networks:
+    - staging
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: staging
+      POSTGRES_USER: staging
+      POSTGRES_PASSWORD: staging
+    volumes:
+      - staging_pgdata:/var/lib/postgresql/data
+    networks:
+      - staging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U staging -d staging"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--requirepass", "staging"]
+    networks:
+      - staging
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "staging", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Обработчик запросов бота (встроенный сервер PHP; для тестового бота этого достаточно)
+  app:
+    <<: *app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "composer install --no-interaction --prefer-dist --no-scripts &&
+             php artisan migrate --force &&
+             php artisan telegram:set-commands || true;
+             php artisan serve --host=0.0.0.0 --port=8000"
+    ports:
+      - "8088:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "php -r \"exit(@file_get_contents('http://127.0.0.1:8000/api/health/simple') === false ? 1 : 0);\""]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  # Получение сообщений тестового бота и передача их в app
+  poll:
+    <<: *app
+    depends_on:
+      app:
+        condition: service_healthy
+    # Если у тестового бота задан webhook, один раз снимите его: ... run --rm poll php artisan telegram:poll --force --once
+    command: php artisan telegram:poll
+
+  # Для проверки бэкапа и других задач по расписанию (можно не запускать: --scale scheduler=0)
+  scheduler:
+    <<: *app
+    depends_on:
+      app:
+        condition: service_healthy
+    command: php artisan schedule:work
+
+volumes:
+  staging_pgdata:
+  staging_vendor:
+
+networks:
+  staging:
+    driver: bridge
