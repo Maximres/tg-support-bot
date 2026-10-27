@@ -11,6 +11,7 @@ use App\Actions\Telegram\EditUserData;
 use App\Actions\Telegram\HandleBackupCommand;
 use App\Actions\Telegram\HandleBroadcastCommand;
 use App\Actions\Telegram\HandleOfferTextCommand;
+use App\Actions\Telegram\HandlePricesImageCommand;
 use App\Actions\Telegram\HandleRefreshMenusCommand;
 use App\Actions\Telegram\HandleOfferDocumentCommand;
 use App\Actions\Telegram\RenameTopic;
@@ -136,7 +137,7 @@ class TelegramBotController
      */
     private function isGlobalAdminCommand(?string $text): bool
     {
-        foreach (array_merge(['/set_code', '/set_building_code', '/set_org_link', '/set_wifi'], HandleBackupCommand::COMMANDS, HandleBroadcastCommand::COMMANDS, HandleOfferDocumentCommand::COMMANDS, HandleOfferTextCommand::COMMANDS, HandleRefreshMenusCommand::COMMANDS, [AdminPanel::COMMAND, SetRentalLink::COMMAND]) as $command) {
+        foreach (array_merge(['/set_code', '/set_building_code', '/set_org_link', '/set_wifi'], HandleBackupCommand::COMMANDS, HandleBroadcastCommand::COMMANDS, HandleOfferDocumentCommand::COMMANDS, HandleOfferTextCommand::COMMANDS, HandleRefreshMenusCommand::COMMANDS, HandlePricesImageCommand::COMMANDS, [AdminPanel::COMMAND, SetRentalLink::COMMAND]) as $command) {
             if ($this->isCommand($command, $text)) {
                 return true;
             }
@@ -434,6 +435,14 @@ class TelegramBotController
                 foreach (HandleOfferDocumentCommand::COMMANDS as $offerCommand) {
                     if ($this->isCommand($offerCommand, $offerCommandText)) {
                         (new HandleOfferDocumentCommand())->execute($this->dataHook, $offerCommand);
+                        die();
+                    }
+                }
+
+                // Картинка кнопки «Цены»: приходит картинкой, а команда — в её подписи
+                foreach (HandlePricesImageCommand::COMMANDS as $pricesCommand) {
+                    if ($this->isCommand($pricesCommand, $offerCommandText)) {
+                        (new HandlePricesImageCommand())->execute($this->dataHook, $pricesCommand);
                         die();
                     }
                 }

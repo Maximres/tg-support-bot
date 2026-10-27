@@ -139,6 +139,10 @@ class SetBotCommands
                 'description' => __('messages.command_set_offer_text_description'),
             ],
             [
+                'command' => 'set_prices_image',
+                'description' => __('messages.command_set_prices_image_description'),
+            ],
+            [
                 'command' => 'refresh_menus',
                 'description' => __('messages.command_refresh_menus_description'),
             ],

@@ -9,6 +9,8 @@ use App\Jobs\SendTelegramSimpleQueryJob;
 use App\Logging\LokiLogger;
 use App\Models\BotSetting;
 use App\Models\SafeCode;
+use App\Services\Rental\OfferText;
+use App\Services\Rental\PricesImage;
 use App\Services\Rental\RentalLinks;
 use App\TelegramBot\TelegramMethods;
 use Illuminate\Http\Request;
@@ -43,6 +45,7 @@ class AdminPanel
         'backup_now' => '/backup_now',
         'backup_on' => '/backup_on',
         'backup_off' => '/backup_off',
+        'refresh_menus' => '/refresh_menus',
     ];
 
     /** Кнопка => [команда, подсказка], для которых нужно значение от администратора */
@@ -53,6 +56,7 @@ class AdminPanel
         'set_building_code' => ['/set_building_code', 'messages.panel.prompt_set_building_code'],
         'set_org_link' => ['/set_org_link', 'messages.panel.prompt_set_org_link'],
         'set_wifi' => ['/set_wifi', 'messages.panel.prompt_set_wifi'],
+        'set_prices_image' => ['/set_prices_image', 'messages.panel.prompt_set_prices_image'],
         'backup_time' => ['/backup_time', 'messages.panel.prompt_backup_time'],
         'backup_days' => ['/backup_days', 'messages.panel.prompt_backup_days'],
         'backup_to' => ['/backup_to', 'messages.panel.prompt_backup_to'],
@@ -212,8 +216,8 @@ class AdminPanel
                 return;
             }
 
-            if (in_array($command, ['/set_offer', '/set_offer_text'], true)) {
-                // PDF (или текст с форматированием) уже в этом сообщении — обработчик сам их разберёт
+            if (in_array($command, ['/set_offer', '/set_offer_text', '/set_prices_image'], true)) {
+                // PDF, картинка (или текст с форматированием) уже в этом сообщении — обработчик сам их разберёт
                 $this->runCommand($update, $command);
                 return;
             }
@@ -248,6 +252,8 @@ class AdminPanel
             '/set_wifi' => (new SetTrustedValue())->execute($update, SafeCodeType::WIFI),
             '/set_offer', '/show_offer' => (new HandleOfferDocumentCommand())->execute($update, $command),
             '/set_offer_text' => (new HandleOfferTextCommand())->execute($update, $command),
+            '/set_prices_image' => (new HandlePricesImageCommand())->execute($update, $command),
+            '/refresh_menus' => (new HandleRefreshMenusCommand())->execute($update, $command),
             default => (new HandleBackupCommand())->execute($update, $command),
         };
     }
@@ -322,6 +328,7 @@ class AdminPanel
             [$button('show_offer'), $button('set_offer')],
             [$button('set_offer_text')],
             [$button('rotate')],
+            [$button('refresh_menus')],
             [$button('backup_status'), $button('backup_now')],
             [$button('backup_on'), $button('backup_off')],
             [$button('backup_time'), $button('backup_days')],
@@ -330,7 +337,8 @@ class AdminPanel
     }
 
     /**
-     * Меню ротации: все коды и ссылки, значения которых админ может заменить (✅ задано, ➖ не задано)
+     * Меню «Ссылки, коды и тексты»: всё, значение чего админ может заменить, в порядке меню клиента
+     * (✅ задано, ➖ не задано)
      *
      * @param TelegramUpdateDto $update
      *
@@ -339,21 +347,32 @@ class AdminPanel
     private function sendRotateMenu(TelegramUpdateDto $update): void
     {
         $mark = fn (bool $isSet) => $isSet ? ' ✅' : ' ➖';
-        $buttons = [];
+        $link = fn (string $key) => [
+            'text' => __("messages.panel.but_link_{$key}") . $mark(RentalLinks::get($key) !== null),
+            'callback_data' => self::CALLBACK_PREFIX . 'link_' . $key,
+        ];
+        $value = fn (string $action, bool $isSet) => [
+            'text' => __("messages.panel.but_{$action}") . $mark($isSet),
+            'callback_data' => self::CALLBACK_PREFIX . $action,
+        ];
 
-        foreach ([['set_code', SafeCodeType::SAFE], ['set_building_code', SafeCodeType::BUILDING], ['set_org_link', SafeCodeType::ORG_LINK], ['set_wifi', SafeCodeType::WIFI]] as [$action, $type]) {
-            $buttons[] = [
-                'text' => __("messages.panel.but_{$action}") . $mark(SafeCode::current($type) !== null),
-                'callback_data' => self::CALLBACK_PREFIX . $action,
-            ];
-        }
-
-        foreach (RentalLinks::KEYS as $key) {
-            $buttons[] = [
-                'text' => __("messages.panel.but_link_{$key}") . $mark(RentalLinks::get($key) !== null),
-                'callback_data' => self::CALLBACK_PREFIX . 'link_' . $key,
-            ];
-        }
+        $buttons = [
+            $link('cabinets'),
+            $link('hub'),
+            $link('map'),
+            $link('schedule'),
+            $link('cancel'),
+            $link('prices'),
+            $value('set_prices_image', PricesImage::fileId() !== null),
+            $link('payment'),
+            $link('keys'),
+            $link('groups'),
+            $value('set_wifi', SafeCode::current(SafeCodeType::WIFI) !== null),
+            $value('set_code', SafeCode::current(SafeCodeType::SAFE) !== null),
+            $value('set_building_code', SafeCode::current(SafeCodeType::BUILDING) !== null),
+            $value('set_org_link', SafeCode::current(SafeCodeType::ORG_LINK) !== null),
+            $value('set_offer_text', OfferText::isCustom()),
+        ];
 
         TelegramMethods::sendQueryTelegram('sendMessage', array_filter([
             'chat_id' => config('traffic_source.settings.telegram.group_id'),

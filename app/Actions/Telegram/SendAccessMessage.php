@@ -8,6 +8,7 @@ use App\Jobs\SendAccessMessageWithCallbackJob;
 use App\Models\BotUser;
 use App\Models\SafeCode;
 use App\Services\Rental\OfferDocument;
+use App\Services\Rental\PricesImage;
 use App\Services\Rental\RentalLinks;
 
 /**
@@ -112,6 +113,10 @@ class SendAccessMessage
                     : null,
                 'offer' => !empty(OfferDocument::fileId())
                     ? ['text' => __('messages.but_menu_offer'), 'callback_data' => 'offer_show']
+                    : null,
+                // «Цены» — картинка или ссылка (достаточно любой)
+                'prices' => $hasAccess && (!empty(PricesImage::fileId()) || !empty(RentalLinks::get('prices')))
+                    ? ['text' => __('messages.but_menu_prices'), 'callback_data' => 'link_show_prices']
                     : null,
                 default => !empty(RentalLinks::get($key)) && ($hasAccess || in_array($key, RentalLinks::PUBLIC, true))
                     ? ['text' => __("messages.but_menu_{$key}"), 'callback_data' => "link_show_{$key}"]

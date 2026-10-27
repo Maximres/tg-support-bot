@@ -5,10 +5,12 @@ namespace Tests\Feature\Rental;
 use App\Actions\Telegram\AdminPanel;
 use App\DTOs\TelegramUpdateDto;
 use App\Enums\SafeCodeType;
+use App\Models\BotUser;
 use App\Models\SafeCode;
 use App\Services\Rental\RentalLinks;
 use App\Services\Backup\DatabaseBackupService;
 use App\Services\Rental\OfferDocument;
+use App\Services\Rental\PricesImage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -119,7 +121,7 @@ class AdminPanelTest extends TestCase
         $this->assertCount(1, $sent);
         $keyboard = $this->markup($sent[0][0]);
 
-        foreach (['show_offer', 'set_offer', 'rotate', 'backup_status', 'backup_now', 'backup_on', 'backup_off', 'backup_time', 'backup_days', 'backup_to'] as $action) {
+        foreach (['show_offer', 'set_offer', 'set_offer_text', 'rotate', 'refresh_menus', 'backup_status', 'backup_now', 'backup_on', 'backup_off', 'backup_time', 'backup_days', 'backup_to'] as $action) {
             $this->assertStringContainsString("panel:{$action}", $keyboard);
         }
 
@@ -183,7 +185,7 @@ class AdminPanelTest extends TestCase
         $this->assertCount(1, $menu);
 
         $keyboard = $this->markup($menu[0][0]);
-        foreach (['set_code', 'set_building_code', 'set_org_link', 'link_hub', 'link_cabinets', 'link_map', 'link_schedule', 'link_payment', 'set_wifi', 'link_keys', 'link_prices', 'link_cancel', 'link_groups'] as $action) {
+        foreach (['set_code', 'set_building_code', 'set_org_link', 'link_hub', 'link_cabinets', 'link_map', 'link_schedule', 'link_payment', 'set_wifi', 'link_keys', 'link_prices', 'set_prices_image', 'set_offer_text', 'link_cancel', 'link_groups'] as $action) {
             $this->assertStringContainsString("panel:{$action}", $keyboard);
         }
 
@@ -194,6 +196,57 @@ class AdminPanelTest extends TestCase
         $this->assertStringContainsString('➖', $labels['panel:set_building_code']);
         $this->assertStringContainsString('✅', $labels['panel:link_schedule']);
         $this->assertStringContainsString('➖', $labels['panel:link_keys']);
+    }
+
+    public function test_rotate_menu_follows_the_client_menu_order_and_marks_prices_image(): void
+    {
+        PricesImage::set('PRICES_FILE');
+
+        (new AdminPanel())->handleCallback($this->callbackDto('panel:rotate'));
+
+        $menu = array_values(array_filter($this->recorded('sendMessage'), fn ($pair) => str_contains($this->markup($pair[0]), 'panel:link_schedule')));
+        $rows = json_decode($this->markup($menu[0][0]), true)['inline_keyboard'];
+        $order = array_column(array_merge(...$rows), 'callback_data');
+        $labels = array_column(array_merge(...$rows), 'text', 'callback_data');
+
+        $this->assertSame('panel:link_cabinets', $order[0]);
+        $this->assertLessThan(array_search('panel:link_cancel', $order), array_search('panel:link_schedule', $order));
+        $this->assertStringContainsString('✅', $labels['panel:set_prices_image']);
+        $this->assertStringContainsString('➖', $labels['panel:set_offer_text']);
+    }
+
+    public function test_refresh_menus_button_runs_the_refresh(): void
+    {
+        $client = BotUser::create(['chat_id' => 5550001, 'platform' => 'telegram', 'topic_id' => 1, 'offer_accepted_at' => now(), 'access_message_id' => 11]);
+
+        (new AdminPanel())->handleCallback($this->callbackDto('panel:refresh_menus'));
+
+        $this->assertCount(1, $this->recorded('editMessageText'));
+        $this->assertSame(5550001, (int)$this->recorded('editMessageText')[0][0]['chat_id']);
+    }
+
+    public function test_prices_image_button_saves_the_photo_sent_in_reply_and_off_removes_it(): void
+    {
+        $promptId = $this->pressPromptButton('set_prices_image');
+        $reply = [
+            'message_id' => $promptId, 'from' => ['id' => 1, 'is_bot' => true, 'first_name' => 'Bot'],
+            'chat' => ['id' => self::GROUP_ID, 'type' => 'supergroup'], 'date' => time(), 'text' => 'p',
+        ];
+
+        (new AdminPanel())->handleReply($this->message([
+            'text' => null,
+            'photo' => [['file_id' => 'SMALL', 'file_size' => 100], ['file_id' => 'BIG', 'file_size' => 5000]],
+            'reply_to_message' => $reply,
+        ]));
+
+        $this->assertSame('BIG', PricesImage::fileId());
+        $this->assertSame('sendPhoto', PricesImage::method());
+
+        $promptId = $this->pressPromptButton('set_prices_image');
+        $reply['message_id'] = $promptId;
+        (new AdminPanel())->handleReply($this->message(['text' => 'off', 'reply_to_message' => $reply]));
+
+        $this->assertNull(PricesImage::fileId());
     }
 
     public function test_link_button_asks_for_a_url_and_the_reply_rotates_it(): void

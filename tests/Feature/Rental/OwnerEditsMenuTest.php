@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Rental;
 
+use App\Actions\Telegram\HandlePricesImageCommand;
+use App\Actions\Telegram\SendAccessMessage;
 use App\Actions\Telegram\SetTrustedValue;
 use App\Actions\Telegram\ShowRentalMaterial;
 use App\Actions\Telegram\ShowTrustedValue;
@@ -9,6 +11,7 @@ use App\DTOs\TelegramUpdateDto;
 use App\Enums\SafeCodeType;
 use App\Models\BotUser;
 use App\Models\SafeCode;
+use App\Services\Rental\PricesImage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -203,5 +206,92 @@ class OwnerEditsMenuTest extends TestCase
         $this->assertStringContainsString('Ключи — актуальная ссылка', $message['text']);
         $this->assertStringNotContainsString('Google Таблицы', $message['text']);
         $this->assertStringContainsString('"text":"Открыть"', $this->markup($message));
+    }
+
+    // ---- «Цены» с картинкой
+
+    public function test_prices_button_sends_the_picture_when_it_is_set(): void
+    {
+        config(['rental.links.prices' => null]);
+        PricesImage::set('PRICES_PHOTO');
+        $botUser = $this->makeBotUser();
+
+        $this->assertContains('link_show_prices', array_column(array_merge(...(new SendAccessMessage())->getKeyboard(true)), 'callback_data'));
+
+        (new ShowRentalMaterial())->showLink($this->callbackDto($botUser, 'link_show_prices'), $botUser, 'prices');
+
+        $photos = $this->sent('sendPhoto');
+        $this->assertCount(1, $photos);
+        $this->assertSame('PRICES_PHOTO', $photos[0][0]['photo']);
+        $this->assertSame($botUser->chat_id, (int)$photos[0][0]['chat_id']);
+        $this->assertCount(0, $this->sent('sendMessage'));
+    }
+
+    public function test_prices_picture_gets_the_link_button_when_the_link_is_set_too(): void
+    {
+        config(['rental.links.prices' => 'https://example.com/prices']);
+        PricesImage::set('PRICES_PHOTO');
+        $botUser = $this->makeBotUser();
+
+        (new ShowRentalMaterial())->showLink($this->callbackDto($botUser, 'link_show_prices'), $botUser, 'prices');
+
+        $markup = $this->markup($this->sent('sendPhoto')[0][0]);
+        $this->assertStringContainsString('https://example.com/prices', $markup);
+        $this->assertStringContainsString('Открыть цены', $markup);
+    }
+
+    public function test_image_sent_as_a_file_is_delivered_as_a_document(): void
+    {
+        config(['rental.links.prices' => null]);
+        PricesImage::set('PRICES_FILE', PricesImage::TYPE_DOCUMENT);
+        $botUser = $this->makeBotUser();
+
+        (new ShowRentalMaterial())->showLink($this->callbackDto($botUser, 'link_show_prices'), $botUser, 'prices');
+
+        $this->assertSame('PRICES_FILE', $this->sent('sendDocument')[0][0]['document']);
+    }
+
+    public function test_prices_button_is_hidden_without_picture_and_link_and_for_untrusted_clients(): void
+    {
+        config(['rental.links.prices' => null]);
+        $this->assertNotContains('link_show_prices', array_column(array_merge(...(new SendAccessMessage())->getKeyboard(true)), 'callback_data'));
+
+        PricesImage::set('PRICES_PHOTO');
+        $this->assertNotContains('link_show_prices', array_column(array_merge(...(new SendAccessMessage())->getKeyboard(false)), 'callback_data'));
+
+        $untrusted = $this->makeBotUser(['is_trusted' => false]);
+        (new ShowRentalMaterial())->showLink($this->callbackDto($untrusted, 'link_show_prices'), $untrusted, 'prices');
+        $this->assertCount(0, $this->sent('sendPhoto'));
+    }
+
+    public function test_set_prices_image_command_takes_the_biggest_photo_and_off_removes_it(): void
+    {
+        $update = TelegramUpdateDto::fromRequest(RequestFacade::create('api/telegram/bot', 'POST', [
+            'update_id' => time(),
+            'message' => [
+                'message_id' => 5,
+                'from' => ['id' => 777, 'is_bot' => false, 'first_name' => 'Admin'],
+                'chat' => ['id' => self::GROUP_ID, 'title' => 'Test Group', 'is_forum' => true, 'type' => 'supergroup'],
+                'date' => time(),
+                'caption' => '/set_prices_image',
+                'photo' => [['file_id' => 'SMALL', 'file_size' => 10], ['file_id' => 'BIG', 'file_size' => 20]],
+            ],
+        ]));
+
+        (new HandlePricesImageCommand())->execute($update, '/set_prices_image');
+        $this->assertSame('BIG', PricesImage::fileId());
+        $this->assertCount(1, $this->sent('sendPhoto'));
+
+        (new HandlePricesImageCommand())->execute($this->groupCommand('/set_prices_image off'), '/set_prices_image');
+        $this->assertNull(PricesImage::fileId());
+
+        // Без картинки команда только подсказывает, как пользоваться
+        (new HandlePricesImageCommand())->execute($this->groupCommand('/set_prices_image'), '/set_prices_image');
+        $this->assertNull(PricesImage::fileId());
+
+        // Не администратор ничего не меняет
+        $this->chatMemberStatus = 'member';
+        (new HandlePricesImageCommand())->execute($update, '/set_prices_image');
+        $this->assertNull(PricesImage::fileId());
     }
 }

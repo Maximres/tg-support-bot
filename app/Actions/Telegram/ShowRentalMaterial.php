@@ -7,6 +7,7 @@ use App\DTOs\TGTextMessageDto;
 use App\Jobs\SendTelegramSimpleQueryJob;
 use App\Models\BotUser;
 use App\Services\Rental\OfferDocument;
+use App\Services\Rental\PricesImage;
 use App\Enums\SafeCodeType;
 use App\Services\Rental\RentalLinks;
 use Illuminate\Support\Facades\Lang;
@@ -111,6 +112,19 @@ class ShowRentalMaterial
         }
 
         $link = RentalLinks::get($key);
+
+        // «Цены»: если задана картинка, клиент получает её (со ссылкой кнопкой под ней, если она тоже задана)
+        if ($key === 'prices' && PricesImage::fileId()) {
+            $this->ack($update->callbackId);
+
+            SendTelegramSimpleQueryJob::dispatch(TGTextMessageDto::from(array_filter([
+                'methodQuery' => PricesImage::method(),
+                'chat_id' => $botUser->chat_id,
+                PricesImage::fileParam() => PricesImage::fileId(),
+                'reply_markup' => $link ? ['inline_keyboard' => [[['text' => $this->buttonLabel($key), 'url' => $link]]]] : null,
+            ], fn ($value) => $value !== null)));
+            return;
+        }
 
         if (empty($link)) {
             $this->ack($update->callbackId, __('messages.access_link_not_set'), true);
