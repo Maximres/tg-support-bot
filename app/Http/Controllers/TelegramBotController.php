@@ -11,6 +11,7 @@ use App\Actions\Telegram\EditUserData;
 use App\Actions\Telegram\HandleBackupCommand;
 use App\Actions\Telegram\HandleBroadcastCommand;
 use App\Actions\Telegram\HandleOfferTextCommand;
+use App\Actions\Telegram\HandleRefreshMenusCommand;
 use App\Actions\Telegram\HandleOfferDocumentCommand;
 use App\Actions\Telegram\RenameTopic;
 use App\Actions\Telegram\ReopenTopic;
@@ -135,7 +136,7 @@ class TelegramBotController
      */
     private function isGlobalAdminCommand(?string $text): bool
     {
-        foreach (array_merge(['/set_code', '/set_building_code', '/set_org_link', '/set_wifi'], HandleBackupCommand::COMMANDS, HandleBroadcastCommand::COMMANDS, HandleOfferDocumentCommand::COMMANDS, HandleOfferTextCommand::COMMANDS, [AdminPanel::COMMAND, SetRentalLink::COMMAND]) as $command) {
+        foreach (array_merge(['/set_code', '/set_building_code', '/set_org_link', '/set_wifi'], HandleBackupCommand::COMMANDS, HandleBroadcastCommand::COMMANDS, HandleOfferDocumentCommand::COMMANDS, HandleOfferTextCommand::COMMANDS, HandleRefreshMenusCommand::COMMANDS, [AdminPanel::COMMAND, SetRentalLink::COMMAND]) as $command) {
             if ($this->isCommand($command, $text)) {
                 return true;
             }
@@ -441,6 +442,14 @@ class TelegramBotController
                 foreach (HandleOfferTextCommand::COMMANDS as $offerTextCommand) {
                     if ($this->isCommand($offerTextCommand, $this->dataHook->text)) {
                         (new HandleOfferTextCommand())->execute($this->dataHook, $offerTextCommand);
+                        die();
+                    }
+                }
+
+                // Обновить закреплённое меню у всех клиентов — глобальная команда администраторов
+                foreach (HandleRefreshMenusCommand::COMMANDS as $refreshMenusCommand) {
+                    if ($this->isCommand($refreshMenusCommand, $this->dataHook->text)) {
+                        (new HandleRefreshMenusCommand())->execute($this->dataHook, $refreshMenusCommand);
                         die();
                     }
                 }

@@ -73,7 +73,11 @@ chown -R www-data:www-data app resources tests routes
 docker compose up -d --force-recreate app queue scheduler   # restart не перечитывает .env
 docker compose exec -T app php artisan telegram:set-commands   # если менялись команды
 scripts/smoke-test.sh
+# если менялась раскладка кнопок меню, ссылки или Wi-Fi: сначала задать их (/set_link, /set_wifi), затем в группе
+# выполнить /refresh_menus (или на сервере: docker compose exec -T app php artisan telegram:refresh-access-menus)
 ```
+
+`/refresh_menus` правит закреплённое меню у всех клиентов на месте: им ничего не приходит. Клиентам без принятого договора меню не трогается.
 
 `scripts/smoke-test.sh` только читает: проверяет контейнеры, сайт, webhook, очередь Telegram и свежие ошибки в журнале; код выхода 1 — есть проблемы.
 

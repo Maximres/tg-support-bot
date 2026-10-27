@@ -2,8 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Actions\Telegram\RefreshAccessMessage;
-use App\Models\BotUser;
+use App\Actions\Telegram\RefreshAllAccessMenus;
 use Illuminate\Console\Command;
 
 class TelegramRefreshAccessMenus extends Command
@@ -17,24 +16,15 @@ class TelegramRefreshAccessMenus extends Command
      */
     public function handle(): int
     {
-        $refresher = new RefreshAccessMessage();
-        $done = 0;
-        $failed = 0;
+        $result = (new RefreshAllAccessMenus())->execute();
 
-        BotUser::query()
-            ->where('platform', 'telegram')
-            ->whereNotNull('chat_id')
-            ->whereNotNull('access_message_id')
-            ->chunkById(20, function ($botUsers) use ($refresher, &$done, &$failed) {
-                foreach ($botUsers as $botUser) {
-                    $refresher->execute($botUser) ? $done++ : $failed++;
-                }
+        if ($result === null) {
+            $this->warn('Обновление меню уже идёт.');
 
-                // Небольшая пауза между пачками, чтобы не упереться в rate limit Telegram
-                sleep(1);
-            });
+            return Command::FAILURE;
+        }
 
-        $this->info("Меню обновлено: {$done}, не удалось: {$failed}");
+        $this->info("Меню обновлено: {$result['done']}, не удалось: {$result['failed']}");
 
         return Command::SUCCESS;
     }
