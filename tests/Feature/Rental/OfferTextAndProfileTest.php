@@ -150,6 +150,7 @@ class OfferTextAndProfileTest extends TestCase
         $this->assertCount(1, $descriptions);
         $this->assertSame(__('messages.bot_profile.description'), $descriptions[0][0]['description']);
         $this->assertLessThanOrEqual(512, mb_strlen($descriptions[0][0]['description']));
+        $this->assertStringContainsString('+375 29 107 1837', $descriptions[0][0]['description']);
 
         $short = $this->sent('setMyShortDescription');
         $this->assertCount(1, $short);
