@@ -143,6 +143,7 @@ class ClientForwardTest extends TestCase
     public function test_service_marks_registered_clients_messages_for_forwarding_but_not_contacts(): void
     {
         Queue::fake();
+        config(['traffic_source.settings.telegram.forward_client_messages' => true]);
         $this->client();
 
         (new TgMessageService($this->privateUpdate(['text' => 'Вопрос по аренде'])))->handleUpdate();
@@ -156,10 +157,10 @@ class ClientForwardTest extends TestCase
         $this->assertContains(false, $flags);
     }
 
-    public function test_forwarding_can_be_disabled_by_config(): void
+    public function test_forwarding_is_off_by_default(): void
     {
         Queue::fake();
-        config(['traffic_source.settings.telegram.forward_client_messages' => false]);
+        $this->assertFalse(config('traffic_source.settings.telegram.forward_client_messages'));
         $this->client();
 
         (new TgMessageService($this->privateUpdate(['text' => 'Вопрос по аренде'])))->handleUpdate();
@@ -172,6 +173,7 @@ class ClientForwardTest extends TestCase
     public function test_edited_client_message_is_shown_again_with_a_note(): void
     {
         Queue::fake();
+        config(['traffic_source.settings.telegram.forward_client_messages' => true]);
         $this->client();
 
         (new TgEditMessageService($this->privateUpdate(['text' => 'Исправленный текст', 'edit_date' => time()], 'edited_message')))->handleUpdate();

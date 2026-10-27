@@ -34,7 +34,7 @@ class TgEditMessageService extends FromTgEditService
             // Сообщения клиента пересылаются в тему и редактироваться там не могут: показываем новую версию
             // отдельным сообщением с пометкой
             if ($this->update->typeSource === 'private' && $this->botUser && !empty($this->botUser->topic_id)
-                && config('traffic_source.settings.telegram.forward_client_messages', true)) {
+                && config('traffic_source.settings.telegram.forward_client_messages', false)) {
                 $this->forwardEditedMessage();
                 return;
             }

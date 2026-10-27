@@ -178,14 +178,14 @@ class RentalOnboardingTest extends TestCase
 
         $keyboard = (new SendAccessMessage())->getKeyboard(false);
 
-        // Описание кабинетов сверху, затем правила, как добраться и договор
+        // Описание кабинетов сверху, затем как добраться, а правила и договор парой в конце
         $this->assertSame([
             [['text' => '🏠 Описание кабинетов', 'callback_data' => 'link_show_cabinets']],
+            [['text' => '🗺 Как добраться', 'callback_data' => 'link_show_map']],
             [
                 ['text' => '📋 Правила', 'callback_data' => 'access_show_org_link'],
-                ['text' => '🗺 Как добраться', 'callback_data' => 'link_show_map'],
+                ['text' => '📄 Договор', 'callback_data' => 'offer_show'],
             ],
-            [['text' => '📄 Договор', 'callback_data' => 'offer_show']],
         ], $keyboard);
     }
 
@@ -218,18 +218,21 @@ class RentalOnboardingTest extends TestCase
         $keyboard = (new SendAccessMessage())->getKeyboard(true);
         $flat = json_encode($keyboard, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-        // Порядок: описание кабинетов сверху, затем правила, как добраться, потом остальное, договор в конце
-        $this->assertCount(1, $keyboard[0]);
-        $this->assertSame('🏠 Описание кабинетов', $keyboard[0][0]['text']);
-        $this->assertSame('link_show_cabinets', $keyboard[0][0]['callback_data']);
-        $this->assertSame('📋 Правила', $keyboard[1][0]['text']);
-        // (карта в этой конфигурации не задана, поэтому после правил сразу идут остальные материалы)
-        $this->assertSame('📋 Все инструкции', $keyboard[1][1]['text']);
-        $this->assertSame('link_show_hub', $keyboard[1][1]['callback_data']);
+        // Порядок: описание кабинетов сверху, дальше ряды-пары по смыслу; «Как добраться» и «Оплата» в этой
+        // конфигурации не заданы, поэтому «Все инструкции» и «Цены» остаются одни в своих рядах
+        $callbacks = array_map(fn ($row) => array_column($row, 'callback_data'), $keyboard);
 
-        // Договор — последний
-        $last = end($keyboard);
-        $this->assertSame('offer_show', end($last)['callback_data']);
+        $this->assertSame([
+            ['link_show_cabinets'],
+            ['link_show_hub'],
+            ['link_show_schedule', 'link_show_cancel'],
+            ['link_show_prices'],
+            ['link_show_keys', 'access_show_codes'],
+            ['link_show_groups', 'access_show_wifi'],
+            ['access_show_org_link', 'offer_show'],
+        ], $callbacks);
+        $this->assertSame('🏠 Описание кабинетов', $keyboard[0][0]['text']);
+        $this->assertSame('📋 Все инструкции', $keyboard[1][0]['text']);
 
         foreach (['link_show_cabinets', 'access_show_wifi', 'link_show_schedule', 'link_show_keys', 'link_show_prices', 'link_show_cancel', 'link_show_groups', 'access_show_codes', 'access_show_org_link', 'offer_show'] as $callback) {
             $this->assertStringContainsString($callback, $flat);
@@ -246,6 +249,18 @@ class RentalOnboardingTest extends TestCase
         // Ни одной ссылки в сообщении: после ротации у клиента не остаётся рабочего старого адреса
         $this->assertStringNotContainsString('example.com', $flat);
         $this->assertStringNotContainsString('"url"', $flat);
+    }
+
+    public function test_pairs_do_not_shift_when_one_button_of_a_row_is_missing(): void
+    {
+        config(['rental.links.cancel' => null, 'rental.links.map' => 'https://example.com/map', 'rental.links.payment' => 'https://example.com/payment']);
+
+        $callbacks = array_map(fn ($row) => array_column($row, 'callback_data'), (new SendAccessMessage())->getKeyboard(true));
+
+        // «Отмена» не задана: «График» остаётся один, а «Цены | Оплата» не съезжают в соседний ряд
+        $this->assertSame(['link_show_hub', 'link_show_map'], $callbacks[1]);
+        $this->assertSame(['link_show_schedule'], $callbacks[2]);
+        $this->assertSame(['link_show_prices', 'link_show_payment'], $callbacks[3]);
     }
 
     public function test_banned_user_gets_the_collapsed_menu_even_if_trusted(): void

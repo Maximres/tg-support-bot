@@ -63,11 +63,12 @@ class OfferTextAndProfileTest extends TestCase
         ));
     }
 
-    public function test_default_offer_text_is_short_and_points_to_the_button(): void
+    public function test_default_offer_text_points_to_the_button_and_fits_the_caption(): void
     {
         $this->assertSame(__('messages.offer_message_text'), OfferText::html());
-        $this->assertLessThan(300, mb_strlen(strip_tags(OfferText::html())));
-        $this->assertStringContainsString('кнопку ниже', OfferText::html());
+        $this->assertLessThanOrEqual(1000, mb_strlen(strip_tags(OfferText::html())));
+        $this->assertStringContainsString('Нажмите кнопку «Принимаю условия»', OfferText::html());
+        $this->assertStringContainsString('договор с ИП напишите об этом нам', OfferText::html());
     }
 
     public function test_admin_sets_the_text_with_telegram_formatting_after_the_command(): void

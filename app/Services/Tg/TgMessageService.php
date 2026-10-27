@@ -129,7 +129,7 @@ class TgMessageService extends FromTgMessageService
     {
         return $this->typeMessage === 'incoming'
             && $this->update->typeSource === 'private'
-            && (bool)config('traffic_source.settings.telegram.forward_client_messages', true)
+            && (bool)config('traffic_source.settings.telegram.forward_client_messages', false)
             && empty($this->update->rawData['message']['contact'])
             && !empty($this->update->messageId);
     }

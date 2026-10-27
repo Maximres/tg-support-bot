@@ -19,6 +19,17 @@ use App\Services\Rental\RentalLinks;
  */
 class SendAccessMessage
 {
+    /** Раскладка меню: каждая строка — ряд кнопок (слева направо), ряды идут сверху вниз */
+    private const MENU_ROWS = [
+        ['cabinets'],
+        ['hub', 'map'],
+        ['schedule', 'cancel'],
+        ['prices', 'payment'],
+        ['keys', 'codes'],
+        ['groups', 'wifi'],
+        ['org_link', 'offer'],
+    ];
+
     /**
      * @param BotUser $botUser
      * @param bool    $force Отправить заново, даже если сообщение уже отправлялось ранее
@@ -86,52 +97,39 @@ class SendAccessMessage
             return [];
         }
 
-        $buttons = [];
-
-        $linkButton = function (string $key) use (&$buttons, $hasAccess) {
-            if (!empty(RentalLinks::get($key)) && ($hasAccess || in_array($key, RentalLinks::PUBLIC, true))) {
-                $buttons[] = ['text' => __("messages.but_menu_{$key}"), 'callback_data' => "link_show_{$key}"];
-            }
+        // Кнопка по ключу пункта меню или null, если пункт не задан / недоступен клиенту
+        $button = function (string $key) use ($hasAccess): ?array {
+            return match ($key) {
+                'org_link' => SafeCode::current(SafeCodeType::ORG_LINK)
+                    ? ['text' => SafeCodeType::ORG_LINK->buttonLabel(), 'callback_data' => SafeCodeType::ORG_LINK->callbackData()]
+                    : null,
+                'wifi' => $hasAccess && SafeCode::current(SafeCodeType::WIFI)
+                    ? ['text' => SafeCodeType::WIFI->buttonLabel(), 'callback_data' => SafeCodeType::WIFI->callbackData()]
+                    : null,
+                // Код сейфа и код здания — одна кнопка «Коды»
+                'codes' => $hasAccess && (SafeCode::current(SafeCodeType::SAFE) || SafeCode::current(SafeCodeType::BUILDING))
+                    ? ['text' => __('messages.but_menu_codes'), 'callback_data' => 'access_show_codes']
+                    : null,
+                'offer' => !empty(OfferDocument::fileId())
+                    ? ['text' => __('messages.but_menu_offer'), 'callback_data' => 'offer_show']
+                    : null,
+                default => !empty(RentalLinks::get($key)) && ($hasAccess || in_array($key, RentalLinks::PUBLIC, true))
+                    ? ['text' => __("messages.but_menu_{$key}"), 'callback_data' => "link_show_{$key}"]
+                    : null,
+            };
         };
 
-        // Порядок: сверху описание кабинетов, затем открытые всем пункты (правила, как добраться),
-        // после них — остальные материалы, в самом конце договор
-        if (SafeCode::current(SafeCodeType::ORG_LINK)) {
-            $buttons[] = ['text' => SafeCodeType::ORG_LINK->buttonLabel(), 'callback_data' => SafeCodeType::ORG_LINK->callbackData()];
-        }
-
-        $linkButton('map');
-
-        if ($hasAccess) {
-            foreach (['hub', 'schedule', 'payment'] as $key) {
-                $linkButton($key);
-            }
-
-            if (SafeCode::current(SafeCodeType::WIFI)) {
-                $buttons[] = ['text' => SafeCodeType::WIFI->buttonLabel(), 'callback_data' => SafeCodeType::WIFI->callbackData()];
-            }
-
-            foreach (['keys', 'prices', 'cancel', 'groups'] as $key) {
-                $linkButton($key);
-            }
-
-            // Код сейфа и код здания — одна кнопка «Коды»
-            if (SafeCode::current(SafeCodeType::SAFE) || SafeCode::current(SafeCodeType::BUILDING)) {
-                $buttons[] = ['text' => __('messages.but_menu_codes'), 'callback_data' => 'access_show_codes'];
-            }
-        }
-
-        // Договор всегда последний
-        if (!empty(OfferDocument::fileId())) {
-            $buttons[] = ['text' => __('messages.but_menu_offer'), 'callback_data' => 'offer_show'];
-        }
-
+        // Описание кабинетов сверху, затем ряды-пары по смыслу; если одной кнопки пары нет, вторая остаётся одна в ряду
         $keyboard = [];
 
-        if (!empty(RentalLinks::get('cabinets'))) {
-            $keyboard[] = [['text' => __('messages.but_menu_cabinets'), 'callback_data' => 'link_show_cabinets']];
+        foreach (self::MENU_ROWS as $keys) {
+            $row = array_values(array_filter(array_map($button, $keys)));
+
+            if ($row !== []) {
+                $keyboard[] = $row;
+            }
         }
 
-        return array_merge($keyboard, array_chunk($buttons, 2));
+        return $keyboard;
     }
 }
