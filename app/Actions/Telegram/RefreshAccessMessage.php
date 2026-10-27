@@ -14,14 +14,21 @@ use Illuminate\Support\Facades\Log;
  */
 class RefreshAccessMessage
 {
+    /** 1, если при последнем вызове execute пересобраны закрепы в чате (убраны старые копии меню), иначе 0 */
+    public int $removed = 0;
+
     /**
      * @param BotUser $botUser
      * @param bool    $notify Отправить клиенту короткое уведомление об изменении доступа
+     * @param bool    $prune  Убрать из закреплённых старые копии меню (см. PruneOldMenuPins)
+     * @param bool    $deep   Глубокая чистка: найти и убрать копии, лежащие под актуальным меню
      *
      * @return bool true, если у клиента теперь актуальное меню
      */
-    public function execute(BotUser $botUser, bool $notify = false): bool
+    public function execute(BotUser $botUser, bool $notify = false, bool $prune = false, bool $deep = false): bool
     {
+        $this->removed = 0;
+
         if ($botUser->platform !== 'telegram' || empty($botUser->chat_id)) {
             return false;
         }
@@ -39,6 +46,10 @@ class RefreshAccessMessage
             // Меню нет (клиент его удалил или оно ещё не отправлялось) — присылаем новое
             (new SendAccessMessage())->execute($botUser, true);
             $refreshed = true;
+        }
+
+        if ($prune && $refreshed && !$botUser->isBanned() && $botUser->fresh()?->hasAccessMessage()) {
+            $this->removed = (new PruneOldMenuPins())->execute($botUser->fresh(), $deep) ? 1 : 0;
         }
 
         if ($notify && !$botUser->isBanned()) {

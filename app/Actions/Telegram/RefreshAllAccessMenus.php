@@ -17,9 +17,11 @@ class RefreshAllAccessMenus
     private const LOCK = 'refresh_all_access_menus';
 
     /**
-     * @return array{done: int, failed: int}|null null, если обновление уже идёт
+     * @param bool $clean Заодно убрать у клиентов старые копии меню из закреплённых (глубоко, см. PruneOldMenuPins)
+     *
+     * @return array{done: int, failed: int, removed: int}|null removed — у скольких клиентов пересобраны закрепы; null, если обновление уже идёт
      */
-    public function execute(): ?array
+    public function execute(bool $clean = false): ?array
     {
         $lock = Cache::lock(self::LOCK, 600);
 
@@ -31,6 +33,7 @@ class RefreshAllAccessMenus
             $refresher = new RefreshAccessMessage();
             $done = 0;
             $failed = 0;
+            $removed = 0;
 
             BotUser::query()
                 ->where('platform', 'telegram')
@@ -38,9 +41,11 @@ class RefreshAllAccessMenus
                 ->whereNotNull('access_message_id')
                 // Без принятого договора меню клиенту не нужно: оно появится после согласия
                 ->whereNotNull('offer_accepted_at')
-                ->chunkById(self::CHUNK, function ($botUsers) use ($refresher, &$done, &$failed) {
+                ->chunkById(self::CHUNK, function ($botUsers) use ($refresher, $clean, &$done, &$failed, &$removed) {
                     foreach ($botUsers as $botUser) {
-                        $refresher->execute($botUser) ? $done++ : $failed++;
+                        // Копии меню, лежащие поверх актуального, убираем всегда; под ним — только при $clean
+                        $refresher->execute($botUser, false, true, $clean) ? $done++ : $failed++;
+                        $removed += $refresher->removed;
                     }
 
                     // Пауза между пачками, чтобы не упереться в лимиты Telegram
@@ -49,7 +54,7 @@ class RefreshAllAccessMenus
                     }
                 });
 
-            return ['done' => $done, 'failed' => $failed];
+            return ['done' => $done, 'failed' => $failed, 'removed' => $removed];
         } finally {
             $lock->release();
         }

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * /refresh_menus — администратор обновляет закреплённое меню у всех клиентов (после смены кнопок, ссылок, Wi-Fi).
+ * Копии меню, лежащие поверх актуального, убираются сами; «/refresh_menus clean» убирает и те, что спрятаны под ним.
  */
 class HandleRefreshMenusCommand
 {
@@ -36,12 +37,15 @@ class HandleRefreshMenusCommand
 
             $this->reply($groupId, $update->messageThreadId, __('messages.refresh_menus.running'));
 
+            $argument = mb_strtolower(trim((string)preg_replace('/^' . preg_quote($command, '/') . '(?:@\w+)?\s*/i', '', (string)$update->text)));
+            $clean = in_array($argument, ['clean', 'чистка', 'дубли'], true);
+
             set_time_limit(600);
-            $result = (new RefreshAllAccessMenus())->execute();
+            $result = (new RefreshAllAccessMenus())->execute($clean);
 
             $this->reply($groupId, $update->messageThreadId, $result === null
                 ? __('messages.refresh_menus.already_running')
-                : __('messages.refresh_menus.done', $result));
+                : __('messages.refresh_menus.done', $result) . ($clean ? '' : "\n\n" . __('messages.refresh_menus.clean_hint')));
         } catch (\Throwable $e) {
             (new LokiLogger())->logException($e);
             Log::error('HandleRefreshMenusCommand: неожиданная ошибка', ['command' => $command, 'error' => $e->getMessage()]);

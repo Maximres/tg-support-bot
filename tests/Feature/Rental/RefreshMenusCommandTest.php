@@ -97,7 +97,7 @@ class RefreshMenusCommandTest extends TestCase
         $clientMessages = array_filter($this->sent('sendMessage'), fn ($pair) => (int)$pair[0]['chat_id'] !== self::GROUP_ID);
         $this->assertCount(0, $clientMessages);
 
-        $this->assertContains(__('messages.refresh_menus.done', ['done' => 2, 'failed' => 0]), $this->groupTexts());
+        $this->assertContains(__('messages.refresh_menus.done', ['done' => 2, 'failed' => 0, 'removed' => 0]) . "\n\n" . __('messages.refresh_menus.clean_hint'), $this->groupTexts());
     }
 
     public function test_only_admins_can_run_it(): void
