@@ -26,7 +26,7 @@ return [
     'access_revoked_notice' => '🔒 Доступ к материалам закрыт. Если это ошибка — напишите в этот чат.',
     'access_link_message' => '🔗 :title — актуальная ссылка:',
     'access_link_message_schedule' => "🔗 График — актуальная ссылка:\n\nС телефона график редактируется через приложение <b>Google Таблицы</b> (скачать для <a href=\":android\">андроида</a> | <a href=\":ios\">айфона</a>)",
-    'but_access_open_schedule' => 'Открыть график',
+    'but_access_open_schedule' => '👉 Открыть график 👈',
     'but_access_open_prices' => 'Открыть цены',
     'command_set_prices_image_description' => 'Задать картинку для кнопки «Цены» (прикрепите её с подписью /set_prices_image)',
     'prices_image' => [
