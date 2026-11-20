@@ -28,6 +28,13 @@ return [
     // отдельным процессом; в тестах выключается (REFRESH_MENUS_IN_BACKGROUND=false) и выполняется сразу
     'refresh_menus_in_background' => (bool)env('REFRESH_MENUS_IN_BACKGROUND', true),
 
+    // Проверка вебхука планировщиком (telegram:check-webhook): сколько обновлений в очереди считается тревогой
+    // и как свежей должна быть ошибка доставки, чтобы о ней сообщать
+    'webhook_monitor' => [
+        'pending_limit' => (int)env('WEBHOOK_MONITOR_PENDING_LIMIT', 20),
+        'error_window_minutes' => (int)env('WEBHOOK_MONITOR_ERROR_WINDOW_MINUTES', 15),
+    ],
+
     // Приложение Google Таблицы: в сообщении «График» подсказываем, где скачать его для телефона
     'apps' => [
         'sheets_android' => env('RENTAL_APP_SHEETS_ANDROID', 'https://play.google.com/store/apps/details?id=com.google.android.apps.docs.editors.sheets'),
