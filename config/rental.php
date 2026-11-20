@@ -24,6 +24,10 @@ return [
         'groups' => env('RENTAL_LINK_GROUPS'),
     ],
 
+    // /refresh_menus обходит всех клиентов дольше таймаута вебхука Telegram, поэтому по умолчанию запускается
+    // отдельным процессом; в тестах выключается (REFRESH_MENUS_IN_BACKGROUND=false) и выполняется сразу
+    'refresh_menus_in_background' => (bool)env('REFRESH_MENUS_IN_BACKGROUND', true),
+
     // Приложение Google Таблицы: в сообщении «График» подсказываем, где скачать его для телефона
     'apps' => [
         'sheets_android' => env('RENTAL_APP_SHEETS_ANDROID', 'https://play.google.com/store/apps/details?id=com.google.android.apps.docs.editors.sheets'),

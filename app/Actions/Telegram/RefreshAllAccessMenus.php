@@ -17,6 +17,23 @@ class RefreshAllAccessMenus
     private const LOCK = 'refresh_all_access_menus';
 
     /**
+     * Текст отчёта для группы
+     *
+     * @param array{done: int, failed: int, removed: int}|null $result null — обновление уже идёт
+     * @param bool                                              $clean
+     *
+     * @return string
+     */
+    public static function summary(?array $result, bool $clean): string
+    {
+        if ($result === null) {
+            return __('messages.refresh_menus.already_running');
+        }
+
+        return __('messages.refresh_menus.done', $result) . ($clean ? '' : "\n\n" . __('messages.refresh_menus.clean_hint'));
+    }
+
+    /**
      * @param bool $clean Заодно убрать у клиентов старые копии меню из закреплённых (глубоко, см. PruneOldMenuPins)
      *
      * @return array{done: int, failed: int, removed: int}|null removed — у скольких клиентов пересобраны закрепы; null, если обновление уже идёт

@@ -40,12 +40,14 @@ class HandleRefreshMenusCommand
             $argument = mb_strtolower(trim((string)preg_replace('/^' . preg_quote($command, '/') . '(?:@\w+)?\s*/i', '', (string)$update->text)));
             $clean = in_array($argument, ['clean', 'чистка', 'дубли'], true);
 
-            set_time_limit(600);
-            $result = (new RefreshAllAccessMenus())->execute($clean);
+            if (config('rental.refresh_menus_in_background')) {
+                // Отчёт в группу пришлёт сам процесс по окончании; ответ вебхуку уходит сразу
+                app(RefreshMenusLauncher::class)->start($clean, $groupId, $update->messageThreadId);
+                return;
+            }
 
-            $this->reply($groupId, $update->messageThreadId, $result === null
-                ? __('messages.refresh_menus.already_running')
-                : __('messages.refresh_menus.done', $result) . ($clean ? '' : "\n\n" . __('messages.refresh_menus.clean_hint')));
+            set_time_limit(600);
+            $this->reply($groupId, $update->messageThreadId, RefreshAllAccessMenus::summary((new RefreshAllAccessMenus())->execute($clean), $clean));
         } catch (\Throwable $e) {
             (new LokiLogger())->logException($e);
             Log::error('HandleRefreshMenusCommand: неожиданная ошибка', ['command' => $command, 'error' => $e->getMessage()]);

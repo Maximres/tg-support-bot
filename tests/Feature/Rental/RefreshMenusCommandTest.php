@@ -3,6 +3,7 @@
 namespace Tests\Feature\Rental;
 
 use App\Actions\Telegram\HandleRefreshMenusCommand;
+use App\Actions\Telegram\RefreshMenusLauncher;
 use App\DTOs\TelegramUpdateDto;
 use App\Models\BotUser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -132,5 +133,40 @@ class RefreshMenusCommandTest extends TestCase
         $this->artisan('telegram:refresh-access-menus')->assertSuccessful();
 
         $this->assertCount(1, $this->sent('editMessageText'));
+    }
+
+    public function test_in_background_mode_the_webhook_request_only_starts_the_process(): void
+    {
+        config(['rental.refresh_menus_in_background' => true]);
+        $this->client(5550001);
+
+        $launcher = new class () extends RefreshMenusLauncher {
+            public array $calls = [];
+
+            public function start(bool $clean, int|string $reportChatId, ?int $reportThreadId): void
+            {
+                $this->calls[] = [$clean, $reportChatId, $reportThreadId];
+            }
+        };
+        $this->app->instance(RefreshMenusLauncher::class, $launcher);
+
+        (new HandleRefreshMenusCommand())->execute($this->groupCommand('/refresh_menus clean'), '/refresh_menus');
+
+        // Меню в самом запросе не обновляется, процесс запущен с нужными параметрами
+        $this->assertCount(0, $this->sent('editMessageText'));
+        $this->assertSame([[true, self::GROUP_ID, null]], $launcher->calls);
+        $this->assertContains(__('messages.refresh_menus.running'), $this->groupTexts());
+    }
+
+    public function test_artisan_command_reports_to_the_group_when_asked(): void
+    {
+        $this->client(5550001);
+
+        $this->artisan('telegram:refresh-access-menus', ['--report-chat' => self::GROUP_ID, '--report-thread' => 7])->assertSuccessful();
+
+        $reports = array_values(array_filter($this->sent('sendMessage'), fn ($pair) => (int)$pair[0]['chat_id'] === self::GROUP_ID));
+        $this->assertCount(1, $reports);
+        $this->assertSame(7, (int)$reports[0][0]['message_thread_id']);
+        $this->assertStringContainsString('Меню обновлено: 1', $reports[0][0]['text']);
     }
 }
